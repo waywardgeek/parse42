@@ -1,0 +1,41 @@
+// This syntax is used parse syntax rules.
+grouping: "{" "\n" "}"
+statement simpleStatement: "statement" handlerExpr ":" patternExpr
+statement blockStatement: "blockstatement" usesExpr ":" patternExpr
+statement ruleStatement: ident ":" ruleExpr
+statement groupingStatement: "grouping" ":" groupingExpr
+blockstatement groupStatement: "group"
+blockstatement precedenceStatement: "precedence"
+statement leftStatement: "left" ident ":" patternExpr
+statement rightStatement: "right" ident ":" patternExpr
+statement mergeStatement: "merge" ident ":" patternExpr
+statement noneStatement: "none" ident ":" patternExpr
+
+group {
+    usesExpr: useSyntax(handlerExpr ident) | handlerExpr
+    handlerExpr: handler(statementExpr dotExpr) | statementExpr
+    dotExpr: ident | dot[ident]
+    statementExpr: ident | before(ident identListExpr) | after(ident identListExpr)
+    identListExpr: ident | sequence[ident]
+
+    none useSyntax: expr "uses" expr
+    none handler: expr "handler" expr
+    none before: expr "before" expr
+    none after: expr "after" expr
+    merge dot: expr '.' expr
+}
+group {
+    ruleExpr: nodeExpr | or[nodeExpr]
+    nodeExpr: ident | string | operator(ident nodeListExpr) | list(ident nodeExpr)
+    nodeListExpr: nodeExpr | sequence(nodeExpr)
+
+    merge or: expr "|" expr
+    none list: expr "[" expr "]"
+    none operator: expr "(" expr ")"
+}
+group {
+    patternExpr: elementExpr | sequence[elementExpr]
+    elementExpr: string | ident
+}
+// This operator is available in all groups
+merge sequence: expr expr # Operators without tokens are allowed

@@ -1,0 +1,118 @@
+module Parse42 p42
+
+// These are the data structures returned to the user.
+
+class Root
+
+class Statement
+    sym type
+
+class Expr
+    sym type
+
+relationship Statement Statement doubly_linked cascade
+relationship Statement Expr doubly_linked cascade
+relationship Expr Expr doubly_linked cascade 
+
+// These data structures are used internally to represet parser rules and to parse input.
+schema parse
+
+enum OperatorType CO_OP_
+    LEFT
+    RIGHT
+    NONASSOCIATIVE
+    MERGE
+
+enum TokenType CO_TOK_
+    INTEGER
+    FLOAT
+    STRING
+    CHAR
+    IDENT
+    OPERATOR
+    COMMENT
+    KEYWORD
+    NEWLINE
+    TAB
+    BEGIN
+    END
+
+enum NodeExprType CO_NODEEXPR_
+    NODERULE
+    OPERATOR
+    LISTOPERATOR
+    INTEGER
+    FLOAT
+    STRING
+    CHAR
+    IDENT
+    EXPR
+    CONSTIDENT
+
+class Syntax
+
+class PrecedenceGroup
+    uint32 precedence
+
+class Staterule
+    sym Sym
+    sym subSyntaxSym
+    bool hasBlock
+    array sym beforeSym
+    array sym afterSym
+    array Keyword signature
+    Funcptr handlerFuncptr
+
+class Operator
+    OperatorType type
+
+class Noderule
+    bool builtNodelist
+
+class Pattern
+
+class Element
+    sym Sym
+    bool isKeyword
+
+class Keyword
+
+class NodeExpr
+    NodeExprType type
+    uint32 lineNum
+    sym Sym
+
+// This is just a group of node expressions that have the same type and sym
+class Nodelist
+    ExprType type
+    sym Sym
+
+class Token
+    TokenType type
+    array uchar text
+    uint32 lineNum
+    union type
+        uint64 intVal: INTEGER
+        double floatVal: FLOAT
+        Keyword keywordVal: KEYWORD OPERATOR
+
+relationship Root Syntax hashed mandatory
+relationship Syntax Staterule hashed signature mandatory
+relationship Syntax Operator hashed mandatory
+relationship Syntax Noderule hashed mandatory
+relationship Syntax Keyword hashed mandatory
+relationship Syntax PrecedenceGroup doubly_linked mandatory
+relationship Syntax Token array // Array of tokens being parsed for a statement
+relationship Syntax Operator:Concatenation child_only
+relationship Staterule Statement doubly_linked cascade
+relationship Staterule Pattern cascade
+relationship Operator Pattern cascade
+relationship Operator Expr doubly_linked cascade
+relationship Noderule NodeExpr doubly_linked cascade
+relationship Noderule Nodelist hashed type Sym mandatory
+relationship Nodelist NodeExpr array
+relationship NodeExpr NodeExpr doubly_linked cascade
+relationship Pattern Element doubly_linked mandatory
+relationship keyword Element doubly_linked cascade
+relationship Element NodeExpr cascade
+relationship PrecedenceGroup Operator doubly_linked mandatory
