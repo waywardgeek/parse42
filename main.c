@@ -1,10 +1,10 @@
 #include "co.h"
 
-coRoot coTheRoot;
-coNamespace coTopNamespace;
-coModule coTopModule;
-coStatement coTopStatement;
-coSyntax coL42Syntax;
+paRoot paTheRoot;
+paNamespace paTopNamespace;
+paModule paTopModule;
+paStatement paTopStatement;
+paSyntax paL42Syntax;
 
 // Create the root module statement.
 void start(
@@ -15,19 +15,19 @@ void start(
     utStart();
     exeName = utReplaceSuffix(utBaseName(arg0), "");
     utInitLogFile(utSprintf("%s.log", exeName));
-    coDatabaseStart();
+    paDatabaseStart();
     vaValueStart();
-    coTheRoot = coRootAlloc();
-    coTopModule = coModuleCreate(coModuleNull, utSymCreate("top"));
-    coTopNamespace = coIdentGetSubNamespace(coModuleGetIdent(coTopModule));
-    coTopStatement = coModuleStatementCreate(coStatementNull, coTopModule);
-    coCreateBuiltins();
+    paTheRoot = paRootAlloc();
+    paTopModule = paModuleCreate(paModuleNull, utSymCreate("top"));
+    paTopNamespace = paIdentGetSubNamespace(paModuleGetIdent(paTopModule));
+    paTopStatement = paModuleStatementCreate(paStatementNull, paTopModule);
+    paCreateBuiltins();
 }
 
 static void stop(void)
 {
     vaValueStop();
-    coDatabaseStop();
+    paDatabaseStop();
     utStop(false);
 }
 
@@ -36,18 +36,18 @@ int main(
     int argc,
     char *argv[])
 {
-    coModule module;
+    paModule module;
     int xArg = 1;
 
     start(argv[0]);
     if(argc >= 2) {
         for(xArg = 1; xArg < argc; xArg++) {
-            module = coParseSourceFile(coTopModule, argv[xArg]);
-            coPreprocessDataTypes(module);
-            //coGenerateCCode(module, utReplaceSuffix(utBaseName(argv[1]), ".c"));
+            module = paParseSourceFile(paTopModule, argv[xArg]);
+            paPreprocessDataTypes(module);
+            //paGenerateCCode(module, utReplaceSuffix(utBaseName(argv[1]), ".c"));
         }
     } else {
-        coInterpreter();
+        paInterpreter();
     }
     stop();
     return 0;

@@ -1,0 +1,66 @@
+module Value va
+
+typedef VoidPtr="NULL"
+typedef uchar="'\0'"
+
+enum Type VA_
+    POSINT
+    NEGINT
+    DOUBLE
+    STRING
+    BOOL
+    TUPLE
+    LIST
+    IDENT
+    OBJECT
+    NULL
+    DICTIONARY
+    BLOB
+    INT
+    // Those below are only used for types
+    FLOAT
+    UINT
+    ENUM
+    ENTRY
+    TYPEDEF
+    VAR
+    VOID
+
+class Root
+
+class String
+    array uint8 value
+
+class List
+
+class Dictionary // Needs custom hash by coValue code
+    uint64 numEntries
+    array DictEntry entry // Storage for the hash table
+
+class DictEntry
+    Value key
+    Value value
+
+class Blob
+    uint64 length
+    VoidPtr value // Note: need to register a destructor hook!
+
+class Value
+    Type type
+    union type
+        uint64 uintVal: POSINT NEGINT
+        uint64 objectVal: OBJECT
+        String stringVal cascade: STRING
+        float floatVal: FLOAT
+        double doubleVal: DOUBLE
+        bool boolVal: BOOL
+        sym nameVal: IDENT
+        List tupleVal cascade: TUPLE
+        List listVal cascade: LIST
+        Dictionary dictionaryVal cascade: DICTIONARY
+        Blob blobVal cascade: BLOB
+
+relationship Root String hashed value
+relationship List Value array child_only cascade
+relationship List Dictionary array child_only cascade
+relationship Dictionary DictEntry doubly_linked mandatory

@@ -1,94 +1,94 @@
 // Expresion methods.
-#include "co.h"
+#include "pa.h"
 
 // Print the operator expr.
 static void printOperatorExpr(
-    coExpr expr)
+    paExpr expr)
 {
-    coOperator operator = coExprGetOperator(expr);
-    coExpr subExpr = coExprGetFirstExpr(expr);
-    coElement element;
-    coKeyword keyword;
+    paOperator operator = paExprGetOperator(expr);
+    paExpr subExpr = paExprGetFirstExpr(expr);
+    paElement element;
+    paKeyword keyword;
     bool firstTime = true;
 
-    if(coOperatorGetType(operator) == CO_OP_MERGE) {
-        printf("%s[", coOperatorGetName(operator));
-        coForeachExprExpr(expr, subExpr) {
+    if(paOperatorGetType(operator) == PA_OP_MERGE) {
+        printf("%s[", paOperatorGetName(operator));
+        paForeachExprExpr(expr, subExpr) {
             if(!firstTime) {
                 printf(" ");
             }
             firstTime = false;
-            coPrintExpr(subExpr);
-        } coEndExprExpr;
+            paPrintExpr(subExpr);
+        } paEndExprExpr;
         printf("]");
     } else {
-        printf("%s(", coOperatorGetName(operator));
-        coForeachPatternElement(coOperatorGetPattern(operator), element) {
-            keyword = coElementGetKeyword(element);
-            if(keyword == coKeywordNull) {
+        printf("%s(", paOperatorGetName(operator));
+        paForeachPatternElement(paOperatorGetPattern(operator), element) {
+            keyword = paElementGetKeyword(element);
+            if(keyword == paKeywordNull) {
                 if(!firstTime) {
                     printf(" ");
                 }
                 firstTime = false;
-                coPrintExpr(subExpr);
-                subExpr = coExprGetNextExprExpr(subExpr);
+                paPrintExpr(subExpr);
+                subExpr = paExprGetNextExprExpr(subExpr);
             }
-        } coEndPatternElement;
-        if(subExpr != coExprNull) {
-            utError("Malformed %s expr", coOperatorGetName(operator));
+        } paEndPatternElement;
+        if(subExpr != paExprNull) {
+            utError("Malformed %s expr", paOperatorGetName(operator));
         }
         printf(")");
     }
 }
 
 // Print the expr.
-void coPrintExpr(
-    coExpr expr)
+void paPrintExpr(
+    paExpr expr)
 {
-    switch(coExprGetType(expr)) {
-    case CO_EXPR_TUPLE:
-    case CO_EXPR_LIST:
-    case CO_EXPR_CONDITIONAL:
-    case CO_EXPR_OR:
-    case CO_EXPR_AND:
-    case CO_EXPR_XOR:
-    case CO_EXPR_NOT:
-    case CO_EXPR_LESS_THAN:
-    case CO_EXPR_GREATER_THAN:
-    case CO_EXPR_EQUAL:
-    case CO_EXPR_GREATER_OR_EQUAL:
-    case CO_EXPR_LESS_OR_EQUAL:
-    case CO_EXPR_NOT_EQUAL:
-    case CO_EXPR_BITOR:
-    case CO_EXPR_BITXOR:
-    case CO_EXPR_BITAND:
-    case CO_EXPR_SHIFT_LEFT:
-    case CO_EXPR_SHIFT_RIGHT:
-    case CO_EXPR_ADD:
-    case CO_EXPR_SUBTRACT:
-    case CO_EXPR_COMPLIMENT:
-    case CO_EXPR_MULTIPLY:
-    case CO_EXPR_DIVIDE:
-    case CO_EXPR_MODULUS:
-    case CO_EXPR_NEGATE:
-    case CO_EXPR_POWER:
-    case CO_EXPR_INDEX:
-    case CO_EXPR_DOT:
-    case CO_EXPR_CALL:
-    case CO_EXPR_ASSIGN:
-    case CO_EXPR_PRE_PLUSPLUS:
-    case CO_EXPR_POST_PLUSPLUS:
-    case CO_EXPR_PRE_MINUSMINUS:
-    case CO_EXPR_POST_MINUSMINUS:
+    switch(paExprGetType(expr)) {
+    case PA_EXPR_TUPLE:
+    case PA_EXPR_LIST:
+    case PA_EXPR_CONDITIONAL:
+    case PA_EXPR_OR:
+    case PA_EXPR_AND:
+    case PA_EXPR_XOR:
+    case PA_EXPR_NOT:
+    case PA_EXPR_LESS_THAN:
+    case PA_EXPR_GREATER_THAN:
+    case PA_EXPR_EQUAL:
+    case PA_EXPR_GREATER_OR_EQUAL:
+    case PA_EXPR_LESS_OR_EQUAL:
+    case PA_EXPR_NOT_EQUAL:
+    case PA_EXPR_BITOR:
+    case PA_EXPR_BITXOR:
+    case PA_EXPR_BITAND:
+    case PA_EXPR_SHIFT_LEFT:
+    case PA_EXPR_SHIFT_RIGHT:
+    case PA_EXPR_ADD:
+    case PA_EXPR_SUBTRACT:
+    case PA_EXPR_COMPLIMENT:
+    case PA_EXPR_MULTIPLY:
+    case PA_EXPR_DIVIDE:
+    case PA_EXPR_MODULUS:
+    case PA_EXPR_NEGATE:
+    case PA_EXPR_POWER:
+    case PA_EXPR_INDEX:
+    case PA_EXPR_DOT:
+    case PA_EXPR_CALL:
+    case PA_EXPR_ASSIGN:
+    case PA_EXPR_PRE_PLUSPLUS:
+    case PA_EXPR_POST_PLUSPLUS:
+    case PA_EXPR_PRE_MINUSMINUS:
+    case PA_EXPR_POST_MINUSMINUS:
         printf("Bill: finisih print expr\n");
         break;
-    case CO_EXPR_VALUE:
-        vaPrintValue(coExprGetValue(expr));
+    case PA_EXPR_VALUE:
+        vaPrintValue(paExprGetValue(expr));
         break;
-    case CO_EXPR_IDENT:
-        printf("%s", utSymGetName(coExprGetSym(expr)));
+    case PA_EXPR_IDENT:
+        printf("%s", utSymGetName(paExprGetSym(expr)));
         break;
-    case CO_EXPR_OPERATOR:
+    case PA_EXPR_OPERATOR:
         printOperatorExpr(expr);
         break;
     default:
@@ -97,80 +97,80 @@ void coPrintExpr(
 }
 
 // Create an expr.
-coExpr coExprCreate(
-    coExprType type)
+paExpr paExprCreate(
+    paExprType type)
 {
-    coExpr expr = coExprAlloc();
+    paExpr expr = paExprAlloc();
 
-    coExprSetType(expr, type);
+    paExprSetType(expr, type);
     return expr;
 }
 
 // Create a unary expresion.
-coExpr coUnaryExprCreate(
-    coExprType type,
-    coExpr a)
+paExpr paUnaryExprCreate(
+    paExprType type,
+    paExpr a)
 {
-    coExpr expr = coExprCreate(type);
+    paExpr expr = paExprCreate(type);
 
-    coExprAppendExpr(expr, a);
+    paExprAppendExpr(expr, a);
     return expr;
 }
 
 // Create a binary expr.
-coExpr coBinaryExprCreate(
-    coExprType type,
-    coExpr a,
-    coExpr b)
+paExpr paBinaryExprCreate(
+    paExprType type,
+    paExpr a,
+    paExpr b)
 {
-    coExpr expr = coExprCreate(type);
+    paExpr expr = paExprCreate(type);
 
-    coExprAppendExpr(expr, a);
-    coExprAppendExpr(expr, b);
+    paExprAppendExpr(expr, a);
+    paExprAppendExpr(expr, b);
     return expr;
 }
 
 // Create an expr with three children.
-coExpr coTrinaryExprCreate(
-    coExprType type,
-    coExpr a,
-    coExpr b,
-    coExpr c)
+paExpr paTrinaryExprCreate(
+    paExprType type,
+    paExpr a,
+    paExpr b,
+    paExpr c)
 {
-    coExpr expr = coExprCreate(type);
+    paExpr expr = paExprCreate(type);
 
-    coExprAppendExpr(expr, a);
-    coExprAppendExpr(expr, b);
-    coExprAppendExpr(expr, c);
+    paExprAppendExpr(expr, a);
+    paExprAppendExpr(expr, b);
+    paExprAppendExpr(expr, c);
     return expr;
 }
 
 // Create a constant expr.
-coExpr coValueExprCreate(
+paExpr paValueExprCreate(
     vaValue value)
 {
-    coExpr expr = coExprCreate(CO_EXPR_VALUE);
+    paExpr expr = paExprCreate(PA_EXPR_VALUE);
 
-    coExprSetValue(expr, value);
+    paExprSetValue(expr, value);
     return expr;
 }
 
 // Create an identifier expr.
-coExpr coIdentExprCreate(
+paExpr paIdentExprCreate(
     utSym sym)
 {
-    coExpr expr = coExprCreate(CO_EXPR_IDENT);
+    paExpr expr = paExprCreate(PA_EXPR_IDENT);
 
-    coExprSetSym(expr, sym);
+    paExprSetSym(expr, sym);
     return expr;
 }
 
 // Create an expr using an operator object.
-coExpr coOperatorExprCreate(
-    coOperator operator)
+paExpr paOperatorExprCreate(
+    paOperator operator)
 {
-    coExpr expr = coExprCreate(CO_EXPR_OPERATOR);
+    paExpr expr = paExprCreate(PA_EXPR_OPERATOR);
 
-    coOperatorAppendExpr(operator, expr);
+    paOperatorAppendExpr(operator, expr);
     return expr;
 }

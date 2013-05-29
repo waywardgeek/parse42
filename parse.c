@@ -27,12 +27,12 @@
 
 #include "co.h"
 
-static coStatement coOuterStatement, coPrevStatement;
-static bool coDebug;
+static paStatement paOuterStatement, paPrevStatement;
+static bool paDebug;
 
 // Print out an error message and exit.
-void coExprError(
-    coExpr expr,
+void paExprError(
+    paExpr expr,
     char *message,
     ...)
 {
@@ -42,262 +42,262 @@ void coExprError(
     va_start(ap, message);
     buff = utVsprintf((char *)message, ap);
     va_end(ap);
-    utError("Line %d: %s", coExprGetLineNum(expr), buff);
+    utError("Line %d: %s", paExprGetLineNum(expr), buff);
 }
 
 // Read one line of tokens.  It is up to the caller to destroy these tokens.
 static bool readOneLine(void)
 {
     printf("Reading one line\n");
-    coSyntax syntax;
-    coStaterule staterule;
-    coToken token = coLex();
+    paSyntax syntax;
+    paStaterule staterule;
+    paToken token = paLex();
     utSym subSyntaxSym;
 
-    if(token == coTokenNull) {
+    if(token == paTokenNull) {
         return false;
     }
     // Now deal with BEGIN/END tokens.
-    if(coTokenGetType(token) == CO_TOK_BEGIN) {
+    if(paTokenGetType(token) == PA_TOK_BEGIN) {
         printf("Starting sub-statements\n");
-        if(coPrevStatement == coStatementNull) {
-            coError(token, "First line may not be intented");
+        if(paPrevStatement == paStatementNull) {
+            paError(token, "First line may not be intented");
         }
-        coOuterStatement = coPrevStatement;
-        subSyntaxSym = coStateruleGetSubSyntaxSym(coStatementGetStaterule(coOuterStatement));
+        paOuterStatement = paPrevStatement;
+        subSyntaxSym = paStateruleGetSubSyntaxSym(paStatementGetStaterule(paOuterStatement));
         if(subSyntaxSym != utSymNull) {
-            syntax = coRootFindSyntax(coTheRoot, subSyntaxSym);
-            if(syntax != coSyntaxNull) {
-                printf("Using syntax %s\n", coSyntaxGetName(syntax));
-                coCurrentSyntax = syntax;
+            syntax = paRootFindSyntax(paTheRoot, subSyntaxSym);
+            if(syntax != paSyntaxNull) {
+                printf("Using syntax %s\n", paSyntaxGetName(syntax));
+                paCurrentSyntax = syntax;
             } else {
-                coError(token, "Syntax %s not found", utSymGetName(subSyntaxSym));
+                paError(token, "Syntax %s not found", utSymGetName(subSyntaxSym));
             }
         }
-        coTokenDestroy(token);
-        token = coLex();
+        paTokenDestroy(token);
+        token = paLex();
     }
-    while(token != coTokenNull && coTokenGetType(token) == CO_TOK_END) {
+    while(token != paTokenNull && paTokenGetType(token) == PA_TOK_END) {
         printf("Finished sub-statements\n");
-        coOuterStatement = coStatementGetStatement(coOuterStatement);
-        staterule = coStatementGetStaterule(coOuterStatement);
-        if(staterule == coStateruleNull) {
-            syntax = coL42Syntax;
+        paOuterStatement = paStatementGetStatement(paOuterStatement);
+        staterule = paStatementGetStaterule(paOuterStatement);
+        if(staterule == paStateruleNull) {
+            syntax = paL42Syntax;
         } else {
-            syntax = coRootFindSyntax(coTheRoot, coStateruleGetSubSyntaxSym(staterule));
-            if(syntax == coSyntaxNull) {
-                syntax = coStateruleGetSyntax(staterule);
+            syntax = paRootFindSyntax(paTheRoot, paStateruleGetSubSyntaxSym(staterule));
+            if(syntax == paSyntaxNull) {
+                syntax = paStateruleGetSyntax(staterule);
             }
         }
-        if(syntax != coCurrentSyntax) {
-            printf("Using syntax %s\n", coSyntaxGetName(syntax));
-            coCurrentSyntax = syntax;
+        if(syntax != paCurrentSyntax) {
+            printf("Using syntax %s\n", paSyntaxGetName(syntax));
+            paCurrentSyntax = syntax;
         }
-        coTokenDestroy(token);
-        token = coLex();
+        paTokenDestroy(token);
+        token = paLex();
     }
-    while(token != coTokenNull && coTokenGetType(token) != CO_TOK_NEWLINE) {
-        if(coTokenGetType(token) == CO_TOK_CHAR) {
-            coError(token, "Illegal character in input");
+    while(token != paTokenNull && paTokenGetType(token) != PA_TOK_NEWLINE) {
+        if(paTokenGetType(token) == PA_TOK_CHAR) {
+            paError(token, "Illegal character in input");
         }
-        coSyntaxAppendToken(coCurrentSyntax, token);
-        coPrintToken(token);
-        token = coLex();
+        paSyntaxAppendToken(paCurrentSyntax, token);
+        paPrintToken(token);
+        token = paLex();
     }
-    if(token != coTokenNull) {
-        coTokenDestroy(token); // We no longer need the NEWLINE token
+    if(token != paTokenNull) {
+        paTokenDestroy(token); // We no longer need the NEWLINE token
     }
-    return coSyntaxGetUsedToken(coCurrentSyntax) > 0;
+    return paSyntaxGetUsedToken(paCurrentSyntax) > 0;
 }
 
 // Destroy the tokens in the token list.
 static void destroyLineTokens(void)
 {
-    coToken token;
+    paToken token;
 
-    coForeachSyntaxToken(coCurrentSyntax, token) {
-        coTokenDestroy(token);
-    } coEndSyntaxToken;
-    coSyntaxSetUsedToken(coCurrentSyntax, 0);
+    paForeachSyntaxToken(paCurrentSyntax, token) {
+        paTokenDestroy(token);
+    } paEndSyntaxToken;
+    paSyntaxSetUsedToken(paCurrentSyntax, 0);
 }
 
-// Find the statement rule matching the current tokens.  We use coKeywordNull to
+// Find the statement rule matching the current tokens.  We use paKeywordNull to
 // hold he place of exprs.
-static coStaterule lookupStaterule(void)
+static paStaterule lookupStaterule(void)
 {
-    coKeyword keywords[coSyntaxGetUsedToken(coCurrentSyntax)];
-    coToken token;
+    paKeyword keywords[paSyntaxGetUsedToken(paCurrentSyntax)];
+    paToken token;
     uint32 numKeywords = 0;
     bool lastWasExpr = false;
 
-    coForeachSyntaxToken(coCurrentSyntax, token) {
-        if(coTokenGetType(token) == CO_TOK_KEYWORD) {
-            keywords[numKeywords++] = coTokenGetKeywordVal(token);
+    paForeachSyntaxToken(paCurrentSyntax, token) {
+        if(paTokenGetType(token) == PA_TOK_KEYWORD) {
+            keywords[numKeywords++] = paTokenGetKeywordVal(token);
             lastWasExpr = false;
         } else {
             if(!lastWasExpr) {
-                keywords[numKeywords++] = coKeywordNull;
+                keywords[numKeywords++] = paKeywordNull;
             }
             lastWasExpr = true;
         }
-    } coEndSyntaxToken;
-    return coSyntaxFindStaterule(coCurrentSyntax, keywords, numKeywords);
+    } paEndSyntaxToken;
+    return paSyntaxFindStaterule(paCurrentSyntax, keywords, numKeywords);
 }
 
 // Determine if the operator matches the occurrence.  We match if the pattern
 // has an expr or not matching hasLeftExpr, and we require the first set of
 // contiguous keywords to match the tokens.
 static bool patternMatches(
-    coPattern pattern,
-    coToken *tokens,
+    paPattern pattern,
+    paToken *tokens,
     uint32 numTokens,
     bool hasLeftExpr)
 {
-    coElement element = coPatternGetFirstElement(pattern);
-    coToken token;
+    paElement element = paPatternGetFirstElement(pattern);
+    paToken token;
     uint32 tokenPos = 0;
 
-    if(hasLeftExpr == (coElementGetKeyword(element) != coKeywordNull)) {
+    if(hasLeftExpr == (paElementGetKeyword(element) != paKeywordNull)) {
         return false;
     }
     if(hasLeftExpr) {
-        element = coElementGetNextPatternElement(element);
+        element = paElementGetNextPatternElement(element);
     }
-    while(element != coElementNull && coElementGetKeyword(element) != coKeywordNull) {
+    while(element != paElementNull && paElementGetKeyword(element) != paKeywordNull) {
         if(tokenPos == numTokens) {
             return false;
         }
         token = tokens[tokenPos++];
-        if(coTokenGetType(token) != CO_TOK_OPERATOR ||
-                coElementGetKeyword(element) != coTokenGetKeywordVal(token)) {
+        if(paTokenGetType(token) != PA_TOK_OPERATOR ||
+                paElementGetKeyword(element) != paTokenGetKeywordVal(token)) {
             return false;
         }
-        element = coElementGetNextPatternElement(element);
+        element = paElementGetNextPatternElement(element);
     }
     return true;
 }
 
 // Find the operator given the left hand expr, and the tokens.
-static coOperator findOperator(
-    coExpr leftExpr,
-    coToken *tokens,
+static paOperator findOperator(
+    paExpr leftExpr,
+    paToken *tokens,
     uint32 numTokens,
-    coKeyword endKeyword)
+    paKeyword endKeyword)
 {
-    coOperator operator;
-    coPattern pattern;
-    coElement element;
-    coKeyword keyword;
-    coToken token = tokens[0];
-    bool hasLeftExpr = leftExpr != coExprNull;
+    paOperator operator;
+    paPattern pattern;
+    paElement element;
+    paKeyword keyword;
+    paToken token = tokens[0];
+    bool hasLeftExpr = leftExpr != paExprNull;
 
     if(numTokens == 0) {
-        return coOperatorNull;
+        return paOperatorNull;
     }
-    if(leftExpr == coExprNull && coTokenGetType(token) != CO_TOK_OPERATOR) {
+    if(leftExpr == paExprNull && paTokenGetType(token) != PA_TOK_OPERATOR) {
         if(numTokens == 1) {
-            return coOperatorNull;
+            return paOperatorNull;
         }
         tokens++;
         numTokens--;
         token = tokens[0];
         hasLeftExpr = true;
     }
-    keyword = coTokenGetKeywordVal(token);
-    if(keyword != coKeywordNull && keyword == endKeyword) {
-        return coOperatorNull;
+    keyword = paTokenGetKeywordVal(token);
+    if(keyword != paKeywordNull && keyword == endKeyword) {
+        return paOperatorNull;
     }
-    if(coTokenGetType(token) != CO_TOK_OPERATOR) {
+    if(paTokenGetType(token) != PA_TOK_OPERATOR) {
         if(!hasLeftExpr) {
-            return coOperatorNull;
+            return paOperatorNull;
         }
         // This is the case where we have two exprs in series with no operator.
-        return coSyntaxGetConcatenationOperator(coCurrentSyntax);
+        return paSyntaxGetConcatenationOperator(paCurrentSyntax);
     }
-    coForeachKeywordElement(keyword, element) {
-        pattern = coElementGetPattern(element);
-        operator = coPatternGetOperator(pattern);
-        if(operator != coOperatorNull && patternMatches(pattern, tokens, numTokens,
+    paForeachKeywordElement(keyword, element) {
+        pattern = paElementGetPattern(element);
+        operator = paPatternGetOperator(pattern);
+        if(operator != paOperatorNull && patternMatches(pattern, tokens, numTokens,
                 hasLeftExpr)) {
             return operator;
         }
-    } coEndKeywordElement;
-    coError(token, "Invalid operator");
-    return coOperatorNull;
+    } paEndKeywordElement;
+    paError(token, "Invalid operator");
+    return paOperatorNull;
 }
 
 // Build an expr for a non-operator token.
-static coExpr buildPrimaryExpr(
-    coToken token)
+static paExpr buildPrimaryExpr(
+    paToken token)
 {
-    coExpr expr;
+    paExpr expr;
 
-    switch(coTokenGetType(token)) {
-    case CO_TOK_INTEGER:
-        expr = coValueExprCreate(vaIntValueCreate(coTokenGetIntVal(token)));
+    switch(paTokenGetType(token)) {
+    case PA_TOK_INTEGER:
+        expr = paValueExprCreate(vaIntValueCreate(paTokenGetIntVal(token)));
         break;
-    case CO_TOK_FLOAT:
-        expr = coValueExprCreate(vaFloatValueCreate(coTokenGetFloatVal(token)));
+    case PA_TOK_FLOAT:
+        expr = paValueExprCreate(vaFloatValueCreate(paTokenGetFloatVal(token)));
         break;
-    case CO_TOK_STRING:
-        expr =  coValueExprCreate(vaStringValueCreate(
-            vaStringCreate(coTokenGetText(token))));
+    case PA_TOK_STRING:
+        expr =  paValueExprCreate(vaStringValueCreate(
+            vaStringCreate(paTokenGetText(token))));
         break;
-    case CO_TOK_IDENT:
-        expr = coIdentExprCreate(utSymCreate((char *)coTokenGetText(token)));
+    case PA_TOK_IDENT:
+        expr = paIdentExprCreate(utSymCreate((char *)paTokenGetText(token)));
         break;
     default:
         utExit("Unknown token type");
     }
-    coExprSetLineNum(expr, coTokenGetLineNum(token));
+    paExprSetLineNum(expr, paTokenGetLineNum(token));
     return expr;
 }
 
 // Find the next keyword after this element in an operator pattern.  Operators
 // with keywords must have alternating operators and exprs.
-static coKeyword findNextKeyword(
-    coElement element)
+static paKeyword findNextKeyword(
+    paElement element)
 {
-    element = coElementGetNextPatternElement(element);
-    if(element == coElementNull || coElementGetKeyword(element) == coKeywordNull) {
-        return coKeywordNull;
+    element = paElementGetNextPatternElement(element);
+    if(element == paElementNull || paElementGetKeyword(element) == paKeywordNull) {
+        return paKeywordNull;
     }
-    return coElementGetKeyword(element);
+    return paElementGetKeyword(element);
 }
 
 // Merge the source expr into the dest.
 static void mergeExprs(
-    coExpr source,
-    coExpr dest)
+    paExpr source,
+    paExpr dest)
 {
-    coExpr subExpr;
+    paExpr subExpr;
 
-    printf("Merging %s operators\n", coOperatorGetName(coExprGetOperator(dest)));
-    coSafeForeachExprExpr(source, subExpr) {
-        coExprRemoveExpr(source, subExpr);
-        coExprAppendExpr(dest, subExpr);
-    } coEndSafeExprExpr;
-    coExprDestroy(source);
+    printf("Merging %s operators\n", paOperatorGetName(paExprGetOperator(dest)));
+    paSafeForeachExprExpr(source, subExpr) {
+        paExprRemoveExpr(source, subExpr);
+        paExprAppendExpr(dest, subExpr);
+    } paEndSafeExprExpr;
+    paExprDestroy(source);
 }
 
 // Just a forward declaration for double recursion.
-static coExpr parseExpr(coToken *tokens, uint32 numTokens, coKeyword
+static paExpr parseExpr(paToken *tokens, uint32 numTokens, paKeyword
     endKeyword, uint32 *tokensParsed);
 
 // Parse one expr at the given precedence.  The left expr exists
 // unless it's a prefix operator.
-static coExpr parseSubExpr(
-    coExpr leftExpr,
-    coToken *tokens,
+static paExpr parseSubExpr(
+    paExpr leftExpr,
+    paToken *tokens,
     uint32 numTokens,
     uint32 precedence,
-    coKeyword endKeyword,
+    paKeyword endKeyword,
     uint32 *tokensParsed)
 {
-    coOperator operator;
-    coElement element;
-    coKeyword keyword, nextEndKeyword;
-    coExpr expr = coExprNull, subExpr;
+    paOperator operator;
+    paElement element;
+    paKeyword keyword, nextEndKeyword;
+    paExpr expr = paExprNull, subExpr;
     uint32 tokenPos = 0;
     uint32 opPrecedence;
     bool firstTime;
@@ -305,65 +305,65 @@ static coExpr parseSubExpr(
 
     utDo {
         operator = findOperator(leftExpr, tokens + tokenPos, numTokens - tokenPos, endKeyword);
-        if(operator == coOperatorNull || precedence >
-                coPrecedenceGroupGetPrecedence(coOperatorGetPrecedenceGroup(operator))) {
-            if(leftExpr != coExprNull) {
+        if(operator == paOperatorNull || precedence >
+                paPrecedenceGroupGetPrecedence(paOperatorGetPrecedenceGroup(operator))) {
+            if(leftExpr != paExprNull) {
                 *tokensParsed = tokenPos;
                 return leftExpr;
             }
-            if(operator == coOperatorNull || coTokenGetType(tokens[0]) != CO_TOK_OPERATOR) {
+            if(operator == paOperatorNull || paTokenGetType(tokens[0]) != PA_TOK_OPERATOR) {
                 *tokensParsed = 1;
                 return buildPrimaryExpr(tokens[0]);
             }
         }
-        isConcatenation = operator == coSyntaxGetConcatenationOperator(coCurrentSyntax);
-        opPrecedence = coPrecedenceGroupGetPrecedence(coOperatorGetPrecedenceGroup(operator));
-    } utWhile(expr == coExprNull || opPrecedence >= precedence) {
-        if(coOperatorGetType(operator) == CO_OP_MERGE && leftExpr != coExprNull &&
-                operator == coExprGetOperator(leftExpr)) {
+        isConcatenation = operator == paSyntaxGetConcatenationOperator(paCurrentSyntax);
+        opPrecedence = paPrecedenceGroupGetPrecedence(paOperatorGetPrecedenceGroup(operator));
+    } utWhile(expr == paExprNull || opPrecedence >= precedence) {
+        if(paOperatorGetType(operator) == PA_OP_MERGE && leftExpr != paExprNull &&
+                operator == paExprGetOperator(leftExpr)) {
             expr = leftExpr;
-            leftExpr = coExprNull;
-            printf("Merging %s operators\n", coOperatorGetName(operator));
+            leftExpr = paExprNull;
+            printf("Merging %s operators\n", paOperatorGetName(operator));
         } else {
-            expr = coOperatorExprCreate(operator);
-            coExprSetLineNum(expr, coTokenGetLineNum(tokens[tokenPos]));
+            expr = paOperatorExprCreate(operator);
+            paExprSetLineNum(expr, paTokenGetLineNum(tokens[tokenPos]));
         }
         firstTime = true;
-        coForeachPatternElement(coOperatorGetPattern(operator), element) {
-            keyword = coElementGetKeyword(element);
-            if(keyword == coKeywordNull) {
+        paForeachPatternElement(paOperatorGetPattern(operator), element) {
+            keyword = paElementGetKeyword(element);
+            if(keyword == paKeywordNull) {
                 // Must be expr
-                if(firstTime && leftExpr != coExprNull) {
+                if(firstTime && leftExpr != paExprNull) {
                     subExpr = leftExpr;
                 } else {
                     nextEndKeyword = findNextKeyword(element);
                     if(isConcatenation && firstTime) {
                         subExpr = parseExpr(tokens + tokenPos, 1,
                             nextEndKeyword, tokensParsed);
-                    } else if(nextEndKeyword != coKeywordNull) {
+                    } else if(nextEndKeyword != paKeywordNull) {
                         subExpr = parseExpr(tokens + tokenPos, numTokens - tokenPos,
                             nextEndKeyword, tokensParsed);
                     } else {
-                        subExpr = parseSubExpr(coExprNull, tokens + tokenPos,
+                        subExpr = parseSubExpr(paExprNull, tokens + tokenPos,
                             numTokens - tokenPos, opPrecedence, endKeyword, tokensParsed);
                     }
                     tokenPos += *tokensParsed;
                 }
-                if(coOperatorGetType(operator) == CO_OP_MERGE &&
-                        operator == coExprGetOperator(subExpr)) {
+                if(paOperatorGetType(operator) == PA_OP_MERGE &&
+                        operator == paExprGetOperator(subExpr)) {
                     mergeExprs(subExpr, expr);
                 } else {
-                    coExprAppendExpr(expr, subExpr);
+                    paExprAppendExpr(expr, subExpr);
                 }
             } else {
-                if(coTokenGetKeywordVal(tokens[tokenPos]) != keyword) {
-                    coError(tokens[tokenPos], "Expected operator %s",
-                        coKeywordGetName(keyword));
+                if(paTokenGetKeywordVal(tokens[tokenPos]) != keyword) {
+                    paError(tokens[tokenPos], "Expected operator %s",
+                        paKeywordGetName(keyword));
                 }
                 tokenPos++;
             }
             firstTime = false;
-        } coEndPatternElement;
+        } paEndPatternElement;
         leftExpr = expr;
     } utRepeat;
     *tokensParsed = tokenPos;
@@ -371,119 +371,119 @@ static coExpr parseSubExpr(
 }
 
 // Recursively parse the expr.
-static coExpr parseExpr(
-    coToken *tokens,
+static paExpr parseExpr(
+    paToken *tokens,
     uint32 numTokens,
-    coKeyword endKeyword,
+    paKeyword endKeyword,
     uint32 *tokensParsed)
 {
-    coExpr expr = parseSubExpr(coExprNull, tokens,
+    paExpr expr = parseSubExpr(paExprNull, tokens,
             numTokens, 0, endKeyword, tokensParsed);
 
-    if(*tokensParsed != numTokens && (endKeyword == coKeywordNull ||
-            coTokenGetKeywordVal(tokens[*tokensParsed]) != endKeyword)) {
-        coError(tokens[*tokensParsed], "Unable to parse entire expr");
+    if(*tokensParsed != numTokens && (endKeyword == paKeywordNull ||
+            paTokenGetKeywordVal(tokens[*tokensParsed]) != endKeyword)) {
+        paError(tokens[*tokensParsed], "Unable to parse entire expr");
     }
     return expr;
 }
 
 // Parse the exprs for the statement.
 static void parseExprs(
-    coStatement statement)
+    paStatement statement)
 {
-    coExpr expr;
-    coToken tokens[coSyntaxGetUsedToken(coCurrentSyntax)];
-    coToken token;
+    paExpr expr;
+    paToken tokens[paSyntaxGetUsedToken(paCurrentSyntax)];
+    paToken token;
     uint32 numTokens = 0;
     uint32 tokensParsed;
 
-    coForeachSyntaxToken(coCurrentSyntax, token) {
-        if(coTokenGetType(token) == CO_TOK_KEYWORD) {
+    paForeachSyntaxToken(paCurrentSyntax, token) {
+        if(paTokenGetType(token) == PA_TOK_KEYWORD) {
             if(numTokens > 0) {
-                expr = parseExpr(tokens, numTokens, coTokenGetKeywordVal(token),
+                expr = parseExpr(tokens, numTokens, paTokenGetKeywordVal(token),
                     &tokensParsed);
-                coStatementAppendExpr(statement, expr);
+                paStatementAppendExpr(statement, expr);
             }
             numTokens = 0;
         } else {
             tokens[numTokens++] = token;
         }
-    } coEndSyntaxToken;
+    } paEndSyntaxToken;
     if(numTokens > 0) {
-        expr = parseExpr(tokens, numTokens, coTokenGetKeywordVal(token),
+        expr = parseExpr(tokens, numTokens, paTokenGetKeywordVal(token),
             &tokensParsed);
-        coStatementAppendExpr(statement, expr);
+        paStatementAppendExpr(statement, expr);
     }
 }
 
-static bool matchNoderule(coNoderule noderule, coExpr expr);
+static bool matchNoderule(paNoderule noderule, paExpr expr);
 
 // Match the noderule to the expr.
 static bool matchNodeExpr(
-    coNodeExpr nodeExpr,
-    coExpr expr)
+    paNodeExpr nodeExpr,
+    paExpr expr)
 {
-    coNoderule noderule;
-    coExpr subExpr;
-    coNodeExpr subNode;
-    coExprType type = coExprGetType(expr);
-    utSym sym = coNodeExprGetSym(nodeExpr);
+    paNoderule noderule;
+    paExpr subExpr;
+    paNodeExpr subNode;
+    paExprType type = paExprGetType(expr);
+    utSym sym = paNodeExprGetSym(nodeExpr);
 
-    if(coDebug) {
+    if(paDebug) {
         printf("Matching nodeExpr ");
-        coPrintNodeExpr(nodeExpr);
+        paPrintNodeExpr(nodeExpr);
         printf(" to ");
-        coPrintExpr(expr);
+        paPrintExpr(expr);
         printf("\n");
     }
-    switch(coNodeExprGetType(nodeExpr)) {
-    case CO_NODEEXPR_NODERULE:
-        noderule = coSyntaxFindNoderule(coCurrentSyntax, sym);
-        if(noderule == coNoderuleNull) {
+    switch(paNodeExprGetType(nodeExpr)) {
+    case PA_NODEEXPR_NODERULE:
+        noderule = paSyntaxFindNoderule(paCurrentSyntax, sym);
+        if(noderule == paNoderuleNull) {
             utExit("Noderule %s not found", utSymGetName(sym));
         }
         return matchNoderule(noderule, expr);
-    case CO_NODEEXPR_OPERATOR:
-        if(type != CO_EXPR_OPERATOR ||
-                coOperatorGetSym(coExprGetOperator(expr)) != sym) {
+    case PA_NODEEXPR_OPERATOR:
+        if(type != PA_EXPR_OPERATOR ||
+                paOperatorGetSym(paExprGetOperator(expr)) != sym) {
             return false;
         }
-        subExpr = coExprGetFirstExpr(expr);
-        coForeachNodeExprNodeExpr(nodeExpr, subNode) {
-            if(subExpr == coExprNull || !matchNodeExpr(subNode, subExpr)) {
+        subExpr = paExprGetFirstExpr(expr);
+        paForeachNodeExprNodeExpr(nodeExpr, subNode) {
+            if(subExpr == paExprNull || !matchNodeExpr(subNode, subExpr)) {
                 return false;
             }
-            subExpr = coExprGetNextExprExpr(subExpr);
-        } coEndNodeExprNodeExpr;
-        return subExpr == coExprNull;
-    case CO_NODEEXPR_LISTOPERATOR:
-        if(type != CO_EXPR_OPERATOR ||
-                coOperatorGetSym(coExprGetOperator(expr)) != sym) {
+            subExpr = paExprGetNextExprExpr(subExpr);
+        } paEndNodeExprNodeExpr;
+        return subExpr == paExprNull;
+    case PA_NODEEXPR_LISTOPERATOR:
+        if(type != PA_EXPR_OPERATOR ||
+                paOperatorGetSym(paExprGetOperator(expr)) != sym) {
             return false;
         }
-        subNode = coNodeExprGetFirstNodeExpr(nodeExpr);
-        coForeachExprExpr(expr, subExpr) {
+        subNode = paNodeExprGetFirstNodeExpr(nodeExpr);
+        paForeachExprExpr(expr, subExpr) {
             if(!matchNodeExpr(subNode, subExpr)) {
                 return false;
             }
-        } coEndExprExpr;
+        } paEndExprExpr;
         return true;
-    case CO_NODEEXPR_INTEGER:
-        return type == CO_EXPR_VALUE &&
-            vaValueGetType(coExprGetValue(expr)) == VA_INT;
-    case CO_NODEEXPR_FLOAT:
-        return type == CO_EXPR_VALUE && vaValueGetType(coExprGetValue(expr)) == VA_FLOAT;
-    case CO_NODEEXPR_STRING:
-        return type == CO_EXPR_VALUE && vaValueGetType(coExprGetValue(expr)) == VA_STRING;
-    case CO_NODEEXPR_IDENT:
-        return type == CO_EXPR_IDENT;
-    case CO_NODEEXPR_CONSTIDENT:
-        if(type != CO_EXPR_VALUE || vaValueGetType(coExprGetValue(expr)) != VA_STRING) {
+    case PA_NODEEXPR_INTEGER:
+        return type == PA_EXPR_VALUE &&
+            vaValueGetType(paExprGetValue(expr)) == VA_INT;
+    case PA_NODEEXPR_FLOAT:
+        return type == PA_EXPR_VALUE && vaValueGetType(paExprGetValue(expr)) == VA_FLOAT;
+    case PA_NODEEXPR_STRING:
+        return type == PA_EXPR_VALUE && vaValueGetType(paExprGetValue(expr)) == VA_STRING;
+    case PA_NODEEXPR_IDENT:
+        return type == PA_EXPR_IDENT;
+    case PA_NODEEXPR_CONSTIDENT:
+        if(type != PA_EXPR_VALUE || vaValueGetType(paExprGetValue(expr)) != VA_STRING) {
             return false;
         }
-        return !strcmp((char *)vaStringGetValue(vaValueGetStringVal(coExprGetValue(expr))),
-            utSymGetName(coNodeExprGetSym(nodeExpr)));
-    case CO_NODEEXPR_EXPR:
+        return !strcmp((char *)vaStringGetValue(vaValueGetStringVal(paExprGetValue(expr))),
+            utSymGetName(paNodeExprGetSym(nodeExpr)));
+    case PA_NODEEXPR_EXPR:
         utError("Invalid use of 'expr' in a node rule");
         break;
     default:
@@ -494,24 +494,24 @@ static bool matchNodeExpr(
 
 // Find the node expression sym corresponding to this expressin.
 static utSym findExprSym(
-    coExpr expr)
+    paExpr expr)
 {
-    coExprType type = coExprGetType(expr);
+    paExprType type = paExprGetType(expr);
 
-    if(type == CO_EXPR_IDENT) {
-        return coIdentSym;
-    } else if(type == CO_EXPR_OPERATOR) {
-        return coOperatorGetSym(coExprGetOperator(expr));
-    } else if(type == CO_EXPR_VALUE) {
-        switch(vaValueGetType(coExprGetValue(expr))) {
+    if(type == PA_EXPR_IDENT) {
+        return paIdentSym;
+    } else if(type == PA_EXPR_OPERATOR) {
+        return paOperatorGetSym(paExprGetOperator(expr));
+    } else if(type == PA_EXPR_VALUE) {
+        switch(vaValueGetType(paExprGetValue(expr))) {
         case VA_INT:
-            return coIntegerSym;
+            return paIntegerSym;
         case VA_FLOAT:
-            return coFloatSym;
+            return paFloatSym;
         case VA_STRING:
-            return coStringSym;
+            return paStringSym;
         case VA_BOOL:
-            return coBoolSym;
+            return paBoolSym;
         default:
             utExit("Unknown value type");
         }
@@ -521,32 +521,32 @@ static utSym findExprSym(
 
 // Match the noderule to the expr.
 static bool matchNoderule(
-    coNoderule noderule,
-    coExpr expr)
+    paNoderule noderule,
+    paExpr expr)
 {
-    coNodeExpr nodeExpr;
-    coNodelist nodelist;
-    coExprType type = coExprGetType(expr);
+    paNodeExpr nodeExpr;
+    paNodelist nodelist;
+    paExprType type = paExprGetType(expr);
     utSym sym = utSymNull;
 
-    if(coDebug) {
+    if(paDebug) {
         printf("Trying noderule ");
-        coPrintNoderule(noderule);
+        paPrintNoderule(noderule);
     }
     sym = findExprSym(expr);
-    nodelist = coNoderuleFindNodelist(noderule, type, sym);
-    if(nodelist == coNodelistNull) {
-        if(coDebug) {
+    nodelist = paNoderuleFindNodelist(noderule, type, sym);
+    if(nodelist == paNodelistNull) {
+        if(paDebug) {
             printf("No noderule found!\n");
         }
         return false;
     }
-    coForeachNodelistNodeExpr(nodelist, nodeExpr) {
+    paForeachNodelistNodeExpr(nodelist, nodeExpr) {
         if(matchNodeExpr(nodeExpr, expr)) {
             return true;
         }
-    } coEndNodelistNodeExpr;
-    if(coDebug) {
+    } paEndNodelistNodeExpr;
+    if(paDebug) {
         printf("Failed to find a match.\n");
     }
     return false;
@@ -554,133 +554,133 @@ static bool matchNoderule(
 
 // See if the exprs match the node rules.
 static void matchNoderules(
-    coStatement statement)
+    paStatement statement)
 {
-    coExpr expr = coStatementGetFirstExpr(statement);
-    coPattern pattern = coStateruleGetPattern(coStatementGetStaterule(statement));
-    coElement element;
-    coNoderule noderule;
+    paExpr expr = paStatementGetFirstExpr(statement);
+    paPattern pattern = paStateruleGetPattern(paStatementGetStaterule(statement));
+    paElement element;
+    paNoderule noderule;
     utSym sym;
 
-    coForeachPatternElement(pattern, element) {
-        if(coElementGetKeyword(element) == coKeywordNull) {
-            sym = coElementGetSym(element);
-            if(sym != coIdentSym) {
-                noderule = coSyntaxFindNoderule(coCurrentSyntax, sym);
-                if(noderule == coNoderuleNull) {
+    paForeachPatternElement(pattern, element) {
+        if(paElementGetKeyword(element) == paKeywordNull) {
+            sym = paElementGetSym(element);
+            if(sym != paIdentSym) {
+                noderule = paSyntaxFindNoderule(paCurrentSyntax, sym);
+                if(noderule == paNoderuleNull) {
                     utError("Noderule %s not defined", utSymGetName(sym));
                 } else {
                     if(!matchNoderule(noderule, expr)) {
-                        coDebug = true;
+                        paDebug = true;
                         matchNoderule(noderule, expr);
-                        coExprError(expr, "Line %u: invalid %s expr", coLineNum,
-                            coNoderuleGetName(noderule));
+                        paExprError(expr, "Line %u: invalid %s expr", paLineNum,
+                            paNoderuleGetName(noderule));
                     }
                 }
             } else {
-                if(coExprGetType(expr) != CO_EXPR_IDENT) {
-                    coExprError(expr, "Line %u: Expected identifier", coLineNum);
+                if(paExprGetType(expr) != PA_EXPR_IDENT) {
+                    paExprError(expr, "Line %u: Expected identifier", paLineNum);
                 }
             }
-            expr = coExprGetNextStatementExpr(expr);
+            expr = paExprGetNextStatementExpr(expr);
         }
-    } coEndPatternElement;
+    } paEndPatternElement;
 }
 
 // Print out the exprs on the statement.
 static void printStatementExprs(
-    coStatement statement)
+    paStatement statement)
 {
-    coExpr expr;
+    paExpr expr;
 
-    coForeachStatementExpr(statement, expr) {
-        coPrintExpr(expr);
+    paForeachStatementExpr(statement, expr) {
+        paPrintExpr(expr);
         printf(" ");
-    } coEndStatementExpr;
+    } paEndStatementExpr;
     printf("\n");
 }
 
 // Remove any trailing comment token from the current input line and return it's string.
 static vaString getLineComment(void)
 {
-    uint32 numTokens = coSyntaxGetUsedToken(coCurrentSyntax);
-    coToken token = coSyntaxGetiToken(coCurrentSyntax, numTokens - 1);
+    uint32 numTokens = paSyntaxGetUsedToken(paCurrentSyntax);
+    paToken token = paSyntaxGetiToken(paCurrentSyntax, numTokens - 1);
     vaString string;
 
-    if(coTokenGetType(token) != CO_TOK_COMMENT) {
+    if(paTokenGetType(token) != PA_TOK_COMMENT) {
         return vaStringNull;
     }
-    coSyntaxSetUsedToken(coCurrentSyntax, numTokens - 1);
-    string = vaStringCreate(coTokenGetText(token));
-    coTokenDestroy(token);
+    paSyntaxSetUsedToken(paCurrentSyntax, numTokens - 1);
+    string = vaStringCreate(paTokenGetText(token));
+    paTokenDestroy(token);
     return string;
 }
 
 // Build a new comment statement.
-static coStatement buildCommentStatement(
+static paStatement buildCommentStatement(
     vaString comment)
 {
-    coStatement statement = coStatementAlloc();
+    paStatement statement = paStatementAlloc();
 
-    coStatementSetType(statement, CO_STATE_COMMENT);
-    coStatementAppendStatement(coOuterStatement, statement);
+    paStatementSetType(statement, PA_STATE_COMMENT);
+    paStatementAppendStatement(paOuterStatement, statement);
     printf("Comment statement: %s\n", vaStringGetValue(comment));
-    coStatementSetComment(statement, comment);
+    paStatementSetComment(statement, comment);
     return statement;
 }
 
 // Parse the tokens in the root list and create a statement from them.
-static coStatement parseStatement(void)
+static paStatement parseStatement(void)
 {
-    coStaterule staterule;
-    coStatement statement;
+    paStaterule staterule;
+    paStatement statement;
     vaString comment = getLineComment();
 
-    if(coSyntaxGetUsedToken(coCurrentSyntax) == 0) {
+    if(paSyntaxGetUsedToken(paCurrentSyntax) == 0) {
         // Just a comment statement
         return buildCommentStatement(comment);
     }
     staterule = lookupStaterule();
-    if(staterule == coStateruleNull) {
-        coError(coSyntaxGetiToken(coCurrentSyntax, 0),
+    if(staterule == paStateruleNull) {
+        paError(paSyntaxGetiToken(paCurrentSyntax, 0),
             "Syntax error: statement not recognized");
     }
     printf("Found staterule: ");
-    coPrintStaterule(staterule);
-    statement = coStatementAlloc();
-    coStatementSetType(statement, CO_STATE_USER);
-    coStatementAppendStatement(coOuterStatement, statement);
-    coStateruleAppendStatement(staterule, statement);
+    paPrintStaterule(staterule);
+    statement = paStatementAlloc();
+    paStatementSetType(statement, PA_STATE_USER);
+    paStatementAppendStatement(paOuterStatement, statement);
+    paStateruleAppendStatement(staterule, statement);
     parseExprs(statement);
     printStatementExprs(statement);
     matchNoderules(statement);
-    coStatementSetComment(statement, comment);
+    paStatementSetComment(statement, comment);
     return statement;
 }
 
 // Run statement handlers on the module's statements, bottom up, so that
 // statements indented more are handled first.
 static void handleStatement(
-    coStatement statement)
+    paStatement statement)
 {
-    coStaterule staterule = coStatementGetStaterule(statement);
-    coStatement subStatement;
-    coFuncptr handlerFuncptr;
-    coStatementHandler handler = NULL;
+    paStaterule staterule = paStatementGetStaterule(statement);
+    paStatement subStatement;
+    paFuncptr handlerFuncptr;
+    paStatementHandler handler = NULL;
 
-    if(staterule == coStateruleNull) {
+    if(staterule == paStateruleNull) {
         return; // Only handle user statements
     }
-    handlerFuncptr = coStateruleGetHandlerFuncptr(staterule);
-    if(handlerFuncptr != coFuncptrNull) {
-        handler = coFuncptrGetValue(handlerFuncptr);
+    handlerFuncptr = paStateruleGetHandlerFuncptr(staterule);
+    if(handlerFuncptr != paFuncptrNull) {
+        handler = paFuncptrGetValue(handlerFuncptr);
     }
-    if(handler != NULL && coStateruleHasBlock(staterule)) {
+    if(handler != NULL && paStateruleHasBlock(staterule)) {
         handler(statement, true);
     }
-    coSafeForeachStatementStatement(statement, subStatement) {
+    paSafeForeachStatementStatement(statement, subStatement) {
         handleStatement(subStatement);
-    } coEndSafeStatementStatement;
+    } paEndSafeStatementStatement;
     if(handler != NULL) {
         handler(statement, false);
     }
@@ -688,30 +688,30 @@ static void handleStatement(
 
 // Parse an L42 file.  This is done one statement at a time.  Statements are
 // NEWLINE terminated.  Sub-statements are between BEGIN and END tokens.
-coModule coParse(
-    coModule outerModule,
+paModule paParse(
+    paModule outerModule,
     utSym moduleName)
 {
-    coModule module = coModuleCreate(outerModule, moduleName);
-    coStatement moduleStatement, statement;
+    paModule module = paModuleCreate(outerModule, moduleName);
+    paStatement moduleStatement, statement;
 
-    coCurrentSyntax = coL42Syntax;
-    statement = coModuleGetStatement(outerModule);
-    moduleStatement = coModuleStatementCreate(statement, module);
-    coOuterStatement = moduleStatement;
-    coLexerStart();
-    coPrevStatement = coStatementNull;
-    //coDebug = false;
-    coDebug = true;
-    coIdentSym = utSymCreate("ident");
+    paCurrentSyntax = paL42Syntax;
+    statement = paModuleGetStatement(outerModule);
+    moduleStatement = paModuleStatementCreate(statement, module);
+    paOuterStatement = moduleStatement;
+    paLexerStart();
+    paPrevStatement = paStatementNull;
+    //paDebug = false;
+    paDebug = true;
+    paIdentSym = utSymCreate("ident");
     while(readOneLine()) {
-        coPrevStatement = parseStatement();
+        paPrevStatement = parseStatement();
         destroyLineTokens();
     }
-    coForeachStatementStatement(moduleStatement, statement) {
+    paForeachStatementStatement(moduleStatement, statement) {
         handleStatement(statement);
-    } coEndStatementStatement;
-    coLexerStop();
-    coPrintSyntax(coL42Syntax);
+    } paEndStatementStatement;
+    paLexerStop();
+    paPrintSyntax(paL42Syntax);
     return module;
 }

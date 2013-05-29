@@ -1,0 +1,79 @@
+L42 data values are inspired by Python and JSON data formats.  They can be converted to text
+and back without any conversion losses.  A compact binary encoded representation is used to
+improve speed of P2P communication.  The motivation for this format is to have a single compact
+binary format with an exact ASCII representation identical to L42's data values, and to allow
+types to be represented.
+
+value: groupValue | number | string | identifier | 'true' | 'false' | 'null' | bytes
+groupValue: list | tuple | dictionary
+list: '[' values ']'
+tuple: '(' values ')'
+dictionary: '{' valuePairs '}'
+number: int | float | objectID
+int: (|-)[0-9]+ | 0x[0-9]+
+float: strtod format, including 0x format
+objectID: 0p[0-9a-fA-F]+
+values: zero or more comma separated values
+valuePairs: zero or more comma separated valuePairs
+valuePair: value ':' value
+identifier: [a-zA-Z\\][
+bytes: 0b[0-9a-zA-Z\-_]*
+
+Strings are UTF-8 encoded.  Double quotes and control characters are backslash escaped, with \n
+\r and \t having the usual meaning.  Backslash followed by a decimal integer inserts the
+character represented by that value, but zero is not legal.  Identifiers use these same
+backslash escapes, but also requier all printable ASCII non-alphanumeric characters to be
+backslash escaped.  If an identifier is 'true', 'false', or 'null', it must have at least one
+character escaped, such as \true.  Identifiers foo and \foo are considered the same.  UTF-8
+characters above 127 do not require escapes in identifiers.  Bytes are filename/URL safe base64
+encoded: http://tools.ietf.org/html/rfc4648, and can be empty, or encode any number of bytes.
+In general, any valid L42 expression should evaluate to an L42 value, and any L42 value is a
+valid L42 expression.  There is the case where a binary value ends with a minus, which may have
+to have a space after it to separate it from a subtract operator.
+
+Examples:
+
+    true
+    false
+    null
+    12345678
+    -12345
+    0xFEDCBA9876543210
+    0xABCp-42
+    0x123456789.AB
+    0p1234
+    [1, 2, 3]
+    (a, 1, "test")
+    0b0123456789ABCDEF
+    {a:1, b:2, 1.23:3.333f}
+    \false
+    {[(0, 1), (2, 3)]:(a, b), {[4, 5, 6]:false}:\true}
+
+L42 type definitions are legal values.  For example:
+
+    Int8
+    ([Value], Bool, Int32])
+    [String]
+
+A binary encoded value is said to be bencoded.  A bencoded value starts with a single byte
+specifying the type.  For integer types, the low three bits plus 1 is the length of the integer
+in bytes.  For others, ASCII characters are used to specify the type, and are followed by data
+if needed.  The type is one of:
+
+    10000XXX - Positive integer with 1 to 8 bytes
+    10001XXX - Negative integer with 1 to 8 bytes coded as a positive integer
+    10010XXX - OBJECTID
+    10011XXX - Byte array - data bytes follow length
+    's' - STRING, UTF-8 encoded, zero-terminated
+    'E' - END
+    'T' - TRUE
+    'F' - FALSE
+    '0' - NULL
+    'f' - FLOAT
+    'g' - DOUBLE
+    'i' - IDENT
+    't' - TUPLE
+    'l' - LIST
+    'd' - DICTIONARY
+
+    Lengths, floats, and doubles are big-endian encoded (default network byte order)

@@ -1,4 +1,7 @@
-module Parse42 p42
+module Parse42 pa
+
+typedef VoidPtr="NULL"
+typedef uchar="'\0'"
 
 // These are the data structures returned to the user.
 
@@ -51,6 +54,10 @@ enum NodeExprType CO_NODEEXPR_
 
 class Syntax
 
+// A compiled function
+class Funcptr
+    VoidPtr value
+
 class PrecedenceGroup
     uint32 precedence
 
@@ -84,7 +91,7 @@ class NodeExpr
 
 // This is just a group of node expressions that have the same type and sym
 class Nodelist
-    ExprType type
+    NodeExprType type
     sym Sym
 
 class Token
@@ -96,7 +103,8 @@ class Token
         double floatVal: FLOAT
         Keyword keywordVal: KEYWORD OPERATOR
 
-relationship Root Syntax hashed mandatory
+relationship Root Syntax hashed
+relationship Root Funcptr hashed
 relationship Syntax Staterule hashed signature mandatory
 relationship Syntax Operator hashed mandatory
 relationship Syntax Noderule hashed mandatory

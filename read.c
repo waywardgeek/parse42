@@ -1,17 +1,17 @@
 #include "co.h"
 
-FILE *coFile;
+FILE *paFile;
 // Must be set before parsing so that the parser knows where to add stuff.
-uint32 coFileSize, coLineNum;
-coSyntax coCurrentSyntax;
-utSym coIdentSym, coIntegerSym, coFloatSym, coStringSym, coBoolSym, coCharSym, coExprSym;
-coModule coBuiltinModule;
+uint32 paFileSize, paLineNum;
+paSyntax paCurrentSyntax;
+utSym paIdentSym, paIntegerSym, paFloatSym, paStringSym, paBoolSym, paCharSym, paExprSym;
+paModule paBuiltinModule;
 
-static coPrecedenceGroup coCurrentPrecedenceGroup;
+static paPrecedenceGroup paCurrentPrecedenceGroup;
 
 // Print out an error message and exit.
-void coNodeExprError(
-    coNodeExpr nodeExpr,
+void paNodeExprError(
+    paNodeExpr nodeExpr,
     char *message,
     ...)
 {
@@ -21,44 +21,44 @@ void coNodeExprError(
     va_start(ap, message);
     buff = utVsprintf((char *)message, ap);
     va_end(ap);
-    utError("Line %d: %s", coNodeExprGetLineNum(nodeExpr), buff);
+    utError("Line %d: %s", paNodeExprGetLineNum(nodeExpr), buff);
 }
 
 // Print a node expr.
-void coPrintNodeExpr(
-    coNodeExpr nodeExpr)
+void paPrintNodeExpr(
+    paNodeExpr nodeExpr)
 {
-    coNodeExpr subNodeExpr;
+    paNodeExpr subNodeExpr;
     bool firstTime;
 
-    switch(coNodeExprGetType(nodeExpr)) {
-    case CO_NODEEXPR_IDENT: printf("ident"); break;
-    case CO_NODEEXPR_EXPR:printf("expr"); break;
-    case CO_NODEEXPR_INTEGER: printf("integer"); break;
-    case CO_NODEEXPR_FLOAT: printf("float"); break;
-    case CO_NODEEXPR_STRING: printf("string"); break;
-    case CO_NODEEXPR_CHAR:printf("char"); break;
-    case CO_NODEEXPR_CONSTIDENT:
-        printf("\"%s\"", utSymGetName(coNodeExprGetSym(nodeExpr)));
+    switch(paNodeExprGetType(nodeExpr)) {
+    case PA_NODEEXPR_IDENT: printf("ident"); break;
+    case PA_NODEEXPR_EXPR:printf("expr"); break;
+    case PA_NODEEXPR_INTEGER: printf("integer"); break;
+    case PA_NODEEXPR_FLOAT: printf("float"); break;
+    case PA_NODEEXPR_STRING: printf("string"); break;
+    case PA_NODEEXPR_CHAR:printf("char"); break;
+    case PA_NODEEXPR_CONSTIDENT:
+        printf("\"%s\"", utSymGetName(paNodeExprGetSym(nodeExpr)));
         break;
-    case CO_NODEEXPR_NODERULE:
-        printf("%s", utSymGetName(coNodeExprGetSym(nodeExpr)));
+    case PA_NODEEXPR_NODERULE:
+        printf("%s", utSymGetName(paNodeExprGetSym(nodeExpr)));
         break;
-    case CO_NODEEXPR_OPERATOR:
-        printf("%s(", utSymGetName(coNodeExprGetSym(nodeExpr)));
+    case PA_NODEEXPR_OPERATOR:
+        printf("%s(", utSymGetName(paNodeExprGetSym(nodeExpr)));
         firstTime = true;
-        coForeachNodeExprNodeExpr(nodeExpr, subNodeExpr) {
+        paForeachNodeExprNodeExpr(nodeExpr, subNodeExpr) {
             if(!firstTime) {
                 printf(" ");
             }
-            coPrintNodeExpr(subNodeExpr);
+            paPrintNodeExpr(subNodeExpr);
             firstTime = false;
-        } coEndNodeExprNodeExpr;
+        } paEndNodeExprNodeExpr;
         printf(")");
         break;
-    case CO_NODEEXPR_LISTOPERATOR:
-        printf("%s[", utSymGetName(coNodeExprGetSym(nodeExpr)));
-        coPrintNodeExpr(coNodeExprGetFirstNodeExpr(nodeExpr));
+    case PA_NODEEXPR_LISTOPERATOR:
+        printf("%s[", utSymGetName(paNodeExprGetSym(nodeExpr)));
+        paPrintNodeExpr(paNodeExprGetFirstNodeExpr(nodeExpr));
         printf("]");
         break;
     default:
@@ -67,360 +67,360 @@ void coPrintNodeExpr(
 }
 
 // Print an element.
-void coPrintElement(
-    coElement element)
+void paPrintElement(
+    paElement element)
 {
-    if(coElementIsKeyword(element)) {
-        printf("\"%s\"", utSymGetName(coElementGetSym(element)));
+    if(paElementIsKeyword(element)) {
+        printf("\"%s\"", utSymGetName(paElementGetSym(element)));
     } else {
-        coPrintNodeExpr(coElementGetNodeExpr(element));
+        paPrintNodeExpr(paElementGetNodeExpr(element));
     }
 }
 
 // Print a pattern.
-void coPrintPattern(
-    coPattern pattern)
+void paPrintPattern(
+    paPattern pattern)
 {
-    coElement element;
+    paElement element;
     bool isFirst = true;
 
-    coForeachPatternElement(pattern, element) {
+    paForeachPatternElement(pattern, element) {
         if(!isFirst) {
             printf(" ");
         }
-        coPrintElement(element);
+        paPrintElement(element);
         isFirst = false;
-    } coEndPatternElement;
+    } paEndPatternElement;
     printf("\n");
 }
 
 // Print the staterule.
-void coPrintStaterule(
-    coStaterule staterule)
+void paPrintStaterule(
+    paStaterule staterule)
 {
-    utSym subSyntaxSym = coStateruleGetSubSyntaxSym(staterule);
-    coFuncptr handlerFuncptr = coStateruleGetHandlerFuncptr(staterule);
+    utSym subSyntaxSym = paStateruleGetSubSyntaxSym(staterule);
+    paFuncptr handlerFuncptr = paStateruleGetHandlerFuncptr(staterule);
     utSym sym;
 
     // TODO: print full use expression
-    if(coStateruleHasBlock(staterule)) {
+    if(paStateruleHasBlock(staterule)) {
         printf("blockstatement ");
     } else {
         printf("statement ");
     }
-    printf("%s", utSymGetName(coStateruleGetSym(staterule)));
-    if(coStateruleGetNumBeforeSym(staterule) > 0) {
+    printf("%s", utSymGetName(paStateruleGetSym(staterule)));
+    if(paStateruleGetNumBeforeSym(staterule) > 0) {
         printf(" before");
-        coForeachStateruleBeforeSym(staterule, sym) {
+        paForeachStateruleBeforeSym(staterule, sym) {
             printf(" %s", utSymGetName(sym));
-        } coEndStateruleBeforeSym;
+        } paEndStateruleBeforeSym;
     }
-    if(coStateruleGetNumAfterSym(staterule) > 0) {
+    if(paStateruleGetNumAfterSym(staterule) > 0) {
         printf(" after");
-        coForeachStateruleAfterSym(staterule, sym) {
+        paForeachStateruleAfterSym(staterule, sym) {
             printf(" %s", utSymGetName(sym));
-        } coEndStateruleAfterSym;
+        } paEndStateruleAfterSym;
     }
-    if(handlerFuncptr != coFuncptrNull) {
-        printf(" handler %s", coFuncptrGetName(handlerFuncptr));
+    if(handlerFuncptr != paFuncptrNull) {
+        printf(" handler %s", paFuncptrGetName(handlerFuncptr));
     }
     if(subSyntaxSym != utSymNull) {
         printf(" uses %s", utSymGetName(subSyntaxSym));
     } 
     printf(": ");
-    coPrintPattern(coStateruleGetPattern(staterule));
+    paPrintPattern(paStateruleGetPattern(staterule));
 }
 
 // Print a node rule.
-void coPrintNoderule(
-    coNoderule noderule)
+void paPrintNoderule(
+    paNoderule noderule)
 {
-    coNodeExpr nodeExpr;
+    paNodeExpr nodeExpr;
     bool firstTime = true;
 
-    printf("%s: ", coNoderuleGetName(noderule));
-    coForeachNoderuleNodeExpr(noderule, nodeExpr) {
+    printf("%s: ", paNoderuleGetName(noderule));
+    paForeachNoderuleNodeExpr(noderule, nodeExpr) {
         if(!firstTime) {
             printf(" | ");
         }
-        coPrintNodeExpr(nodeExpr);
+        paPrintNodeExpr(nodeExpr);
         firstTime = false;
-    } coEndNoderuleNodeExpr;
+    } paEndNoderuleNodeExpr;
     printf("\n");
 }
 
 // Print the operator.
-void coPrintOperator(
-    coOperator operator)
+void paPrintOperator(
+    paOperator operator)
 {
-    switch(coOperatorGetType(operator)) {
-    case CO_OP_LEFT: printf("left"); break;
-    case CO_OP_RIGHT: printf("right"); break;
-    case CO_OP_NONASSOCIATIVE: printf("nonassociative"); break;
-    case CO_OP_MERGE: printf("merge"); break;
+    switch(paOperatorGetType(operator)) {
+    case PA_OP_LEFT: printf("left"); break;
+    case PA_OP_RIGHT: printf("right"); break;
+    case PA_OP_NONASSOCIATIVE: printf("nonassociative"); break;
+    case PA_OP_MERGE: printf("merge"); break;
     default:
         utExit("Unknown operator type");
     }
-    printf(" %s: ", coOperatorGetName(operator));
-    coPrintPattern(coOperatorGetPattern(operator));
+    printf(" %s: ", paOperatorGetName(operator));
+    paPrintPattern(paOperatorGetPattern(operator));
 }
 
 // Return the number of operators in the precedence group.
 static uint32 countPrecedenceGroupOperators(
-    coPrecedenceGroup precedenceGroup)
+    paPrecedenceGroup precedenceGroup)
 {
-    coOperator operator;
+    paOperator operator;
     uint32 numOperators = 0;
 
-    coForeachPrecedenceGroupOperator(precedenceGroup, operator) {
+    paForeachPrecedenceGroupOperator(precedenceGroup, operator) {
         numOperators++;
-    } coEndPrecedenceGroupOperator;
+    } paEndPrecedenceGroupOperator;
     return numOperators;
 }
 
 // Print a precedence group.
-void coPrintPrecedenceGroup(
-    coPrecedenceGroup precedenceGroup)
+void paPrintPrecedenceGroup(
+    paPrecedenceGroup precedenceGroup)
 {
-    coOperator operator;
+    paOperator operator;
 
     if(countPrecedenceGroupOperators(precedenceGroup) == 1) {
-        coPrintOperator(coPrecedenceGroupGetFirstOperator(precedenceGroup));
+        paPrintOperator(paPrecedenceGroupGetFirstOperator(precedenceGroup));
     } else {
         printf("group\n");
-        coForeachPrecedenceGroupOperator(precedenceGroup, operator) {
+        paForeachPrecedenceGroupOperator(precedenceGroup, operator) {
             printf("\t\t");
-            coPrintOperator(operator);
-        } coEndPrecedenceGroupOperator;
+            paPrintOperator(operator);
+        } paEndPrecedenceGroupOperator;
     }
 }
 
 // Print out the syntax.
-void coPrintSyntax(
-    coSyntax syntax)
+void paPrintSyntax(
+    paSyntax syntax)
 {
-    coStaterule staterule;
-    coNoderule noderule;
-    coPrecedenceGroup precedenceGroup;
+    paStaterule staterule;
+    paNoderule noderule;
+    paPrecedenceGroup precedenceGroup;
 
-    printf("syntax %s\n", coSyntaxGetName(syntax));
-    coForeachSyntaxStaterule(syntax, staterule) {
+    printf("syntax %s\n", paSyntaxGetName(syntax));
+    paForeachSyntaxStaterule(syntax, staterule) {
         printf("\t");
-        coPrintStaterule(staterule);
-    } coEndSyntaxStaterule;
-    coForeachSyntaxNoderule(syntax, noderule) {
+        paPrintStaterule(staterule);
+    } paEndSyntaxStaterule;
+    paForeachSyntaxNoderule(syntax, noderule) {
         printf("\t");
-        coPrintNoderule(noderule);
-    } coEndSyntaxNoderule;
-    coForeachSyntaxPrecedenceGroup(syntax, precedenceGroup) {
+        paPrintNoderule(noderule);
+    } paEndSyntaxNoderule;
+    paForeachSyntaxPrecedenceGroup(syntax, precedenceGroup) {
         printf("\t");
-        coPrintPrecedenceGroup(precedenceGroup);
-    } coEndSyntaxPrecedenceGroup;
+        paPrintPrecedenceGroup(precedenceGroup);
+    } paEndSyntaxPrecedenceGroup;
 }
 
 // Create a new Syntax object.
-coSyntax coSyntaxCreate(
+paSyntax paSyntaxCreate(
     utSym sym)
 {
-    coSyntax syntax = coRootFindSyntax(coTheRoot, sym);
+    paSyntax syntax = paRootFindSyntax(paTheRoot, sym);
 
-    if(syntax == coSyntaxNull) {
-        syntax = coSyntaxAlloc();
-        coSyntaxSetSym(syntax, sym);
-        coRootAppendSyntax(coTheRoot, syntax);
+    if(syntax == paSyntaxNull) {
+        syntax = paSyntaxAlloc();
+        paSyntaxSetSym(syntax, sym);
+        paRootAppendSyntax(paTheRoot, syntax);
     }
     return syntax;
 }
 
 // Create a Noderule object for matching node exprs.
-static coNoderule noderuleCreate(
-    coSyntax syntax,
+static paNoderule noderuleCreate(
+    paSyntax syntax,
     char *name,
     ...)
 {
-    coNoderule noderule = coNoderuleAlloc();
+    paNoderule noderule = paNoderuleAlloc();
     va_list ap;
-    coNodeExpr arg;
+    paNodeExpr arg;
 
-    coNoderuleSetSym(noderule, utSymCreate(name));
-    coSyntaxAppendNoderule(syntax, noderule);
+    paNoderuleSetSym(noderule, utSymCreate(name));
+    paSyntaxAppendNoderule(syntax, noderule);
     va_start(ap, name); 
-    arg = va_arg(ap, coNodeExpr);
-    while(arg != coNodeExprNull) {
-        coNoderuleAppendNodeExpr(noderule, arg);
-        arg = va_arg(ap, coNodeExpr);
+    arg = va_arg(ap, paNodeExpr);
+    while(arg != paNodeExprNull) {
+        paNoderuleAppendNodeExpr(noderule, arg);
+        arg = va_arg(ap, paNodeExpr);
     }
     va_end(ap);
     return noderule;
 }
 
 // Create an operator node expr, with a list of sub-node exprs.
-static coNodeExpr opNodeExprCreate(
+static paNodeExpr opNodeExprCreate(
     char *operatorName,
     ...)
 {
-    coNodeExpr nodeExpr = coNodeExprAlloc();
+    paNodeExpr nodeExpr = paNodeExprAlloc();
     va_list ap;
-    coNodeExpr arg;
+    paNodeExpr arg;
 
-    coNodeExprSetType(nodeExpr, CO_NODEEXPR_OPERATOR);
-    coNodeExprSetSym(nodeExpr, utSymCreate(operatorName));
+    paNodeExprSetType(nodeExpr, PA_NODEEXPR_OPERATOR);
+    paNodeExprSetSym(nodeExpr, utSymCreate(operatorName));
     va_start(ap, operatorName); 
-    arg = va_arg(ap, coNodeExpr);
-    while(arg != coNodeExprNull) {
-        coNodeExprAppendNodeExpr(nodeExpr, arg);
-        arg = va_arg(ap, coNodeExpr);
+    arg = va_arg(ap, paNodeExpr);
+    while(arg != paNodeExprNull) {
+        paNodeExprAppendNodeExpr(nodeExpr, arg);
+        arg = va_arg(ap, paNodeExpr);
     }
     va_end(ap);
     return nodeExpr;
 }
 
 // Create an identifier token node expr.
-static coNodeExpr coTokenNodeExprCreate(
-    coNodeExprType type)
+static paNodeExpr paTokenNodeExprCreate(
+    paNodeExprType type)
 {
-    coNodeExpr nodeExpr = coNodeExprAlloc();
+    paNodeExpr nodeExpr = paNodeExprAlloc();
 
-    coNodeExprSetType(nodeExpr, type);
+    paNodeExprSetType(nodeExpr, type);
     return nodeExpr;
 }
 
 // Create a sub-node rule node expr.
-static coNodeExpr coSubruleNodeExprCreate(
+static paNodeExpr paSubruleNodeExprCreate(
     char *ruleName)
 {
-    coNodeExpr nodeExpr = coNodeExprAlloc();
+    paNodeExpr nodeExpr = paNodeExprAlloc();
 
-    coNodeExprSetType(nodeExpr, CO_NODEEXPR_NODERULE);
-    coNodeExprSetSym(nodeExpr, utSymCreate(ruleName));
+    paNodeExprSetType(nodeExpr, PA_NODEEXPR_NODERULE);
+    paNodeExprSetSym(nodeExpr, utSymCreate(ruleName));
     return nodeExpr;
 }
 
 // Create a list operator node expr.
-static coNodeExpr listNodeExprCreate(
+static paNodeExpr listNodeExprCreate(
     char *operatorName,
-    coNodeExpr subNodeExpr)
+    paNodeExpr subNodeExpr)
 {
-    coNodeExpr nodeExpr = coNodeExprAlloc();
+    paNodeExpr nodeExpr = paNodeExprAlloc();
 
-    coNodeExprSetType(nodeExpr, CO_NODEEXPR_LISTOPERATOR);
-    coNodeExprSetSym(nodeExpr, utSymCreate(operatorName));
-    coNodeExprAppendNodeExpr(nodeExpr, subNodeExpr);
+    paNodeExprSetType(nodeExpr, PA_NODEEXPR_LISTOPERATOR);
+    paNodeExprSetSym(nodeExpr, utSymCreate(operatorName));
+    paNodeExprAppendNodeExpr(nodeExpr, subNodeExpr);
     return nodeExpr;
 }
 
 // Create a new element.
-static coElement elementCreate(
-    coSyntax syntax,
-    coPattern pattern,
+static paElement elementCreate(
+    paSyntax syntax,
+    paPattern pattern,
     char *text)
 {
-    coElement element = coElementAlloc();
-    coKeyword keyword;
-    coNodeExpr nodeExpr = coNodeExprNull;
+    paElement element = paElementAlloc();
+    paKeyword keyword;
+    paNodeExpr nodeExpr = paNodeExprNull;
     utSym sym = utSymCreate(text);
 
-    coElementSetSym(element, sym);
+    paElementSetSym(element, sym);
     if(!strcmp(text, "expr")) {
-        nodeExpr = coTokenNodeExprCreate(CO_NODEEXPR_EXPR);
+        nodeExpr = paTokenNodeExprCreate(PA_NODEEXPR_EXPR);
     } else if(!strcmp(text + strlen(text) - 4, "Expr")) {
-        nodeExpr = coSubruleNodeExprCreate(text);
+        nodeExpr = paSubruleNodeExprCreate(text);
     } else if(!strcmp(text, "ident")) {
-        nodeExpr = coTokenNodeExprCreate(CO_NODEEXPR_IDENT);
+        nodeExpr = paTokenNodeExprCreate(PA_NODEEXPR_IDENT);
     } else {
-        coElementSetIsKeyword(element, true);
-        keyword = coSyntaxFindKeyword(syntax, sym);
-        if(keyword == coKeywordNull) {
-            keyword = coKeywordAlloc();
-            coKeywordSetSym(keyword, sym);
-            coSyntaxAppendKeyword(syntax, keyword);
+        paElementSetIsKeyword(element, true);
+        keyword = paSyntaxFindKeyword(syntax, sym);
+        if(keyword == paKeywordNull) {
+            keyword = paKeywordAlloc();
+            paKeywordSetSym(keyword, sym);
+            paSyntaxAppendKeyword(syntax, keyword);
         }
-        coKeywordAppendElement(keyword, element);
+        paKeywordAppendElement(keyword, element);
     }
-    coElementSetNodeExpr(element, nodeExpr);
-    coPatternAppendElement(pattern, element);
+    paElementSetNodeExpr(element, nodeExpr);
+    paPatternAppendElement(pattern, element);
     return element;
 }
 
 // Create a new statement parsing rule.
-static coStaterule stateruleCreate(
-    coSyntax syntax,
-    coStatementHandler handler,
+static paStaterule stateruleCreate(
+    paSyntax syntax,
+    paStatementHandler handler,
     char *name,
     bool hasBlock,
     ...)
 {
-    coStaterule staterule = coStateruleAlloc();
-    coPattern pattern = coPatternAlloc();
-    coElement element;
-    coFuncptr handlerFuncptr = coFuncptrNull;
+    paStaterule staterule = paStateruleAlloc();
+    paPattern pattern = paPatternAlloc();
+    paElement element;
+    paFuncptr handlerFuncptr = paFuncptrNull;
     va_list ap;
     char *arg;
 
-    coStateruleInsertPattern(staterule, pattern);
-    coStateruleSetSym(staterule, utSymCreate(name));
+    paStateruleInsertPattern(staterule, pattern);
+    paStateruleSetSym(staterule, utSymCreate(name));
     if(handler != NULL) {
-        handlerFuncptr = coFuncptrCreate(coBuiltinModule,
+        handlerFuncptr = paFuncptrCreate(paBuiltinModule,
             utSymCreateFormatted("%sHandler", name), handler);
-        coStateruleSetHandlerFuncptr(staterule, handlerFuncptr);
+        paStateruleSetHandlerFuncptr(staterule, handlerFuncptr);
     }
-    coStateruleSetHasBlock(staterule, hasBlock);
+    paStateruleSetHasBlock(staterule, hasBlock);
     va_start(ap, hasBlock); 
     arg = va_arg(ap, char *);
     while(arg != NULL) {
         element = elementCreate(syntax, pattern, arg);
-        if(coElementIsKeyword(element)) {
-            coStateruleAppendSignature(staterule, coElementGetKeyword(element));
+        if(paElementIsKeyword(element)) {
+            paStateruleAppendSignature(staterule, paElementGetKeyword(element));
         } else {
             // Apend NULL keywords where exprs go.
-            coStateruleAppendSignature(staterule, coKeywordNull);
+            paStateruleAppendSignature(staterule, paKeywordNull);
         }
         arg = va_arg(ap, char *);
     }
     va_end(ap);
-    coSyntaxAppendStaterule(syntax, staterule);
+    paSyntaxAppendStaterule(syntax, staterule);
     return staterule;
 }
 
 // Create a new precedence group.
-coPrecedenceGroup coPrecedenceGroupCreate(
-    coSyntax syntax,
-    coOperator operator)
+paPrecedenceGroup paPrecedenceGroupCreate(
+    paSyntax syntax,
+    paOperator operator)
 {
-    coPrecedenceGroup precedenceGroup = coPrecedenceGroupAlloc();
-    coPrecedenceGroup prevGroup = coPrecedenceGroupNull, nextGroup;
+    paPrecedenceGroup precedenceGroup = paPrecedenceGroupAlloc();
+    paPrecedenceGroup prevGroup = paPrecedenceGroupNull, nextGroup;
 
-    if(operator != coOperatorNull) {
-        nextGroup = coOperatorGetPrecedenceGroup(operator);
-        prevGroup = coPrecedenceGroupGetPrevSyntaxPrecedenceGroup(nextGroup);
+    if(operator != paOperatorNull) {
+        nextGroup = paOperatorGetPrecedenceGroup(operator);
+        prevGroup = paPrecedenceGroupGetPrevSyntaxPrecedenceGroup(nextGroup);
     }
-    if(prevGroup != coPrecedenceGroupNull) {
-        coSyntaxInsertAfterPrecedenceGroup(syntax, prevGroup, precedenceGroup);
+    if(prevGroup != paPrecedenceGroupNull) {
+        paSyntaxInsertAfterPrecedenceGroup(syntax, prevGroup, precedenceGroup);
     } else {
-        coSyntaxAppendPrecedenceGroup(syntax, precedenceGroup);
+        paSyntaxAppendPrecedenceGroup(syntax, precedenceGroup);
     }
     return precedenceGroup;
 }
 
 // Create a new operator.
-static coOperator operatorCreate(
-    coSyntax syntax,
-    coOperatorType type,
+static paOperator operatorCreate(
+    paSyntax syntax,
+    paOperatorType type,
     char *name,
     ...)
 {
-    coPrecedenceGroup precedenceGroup = coPrecedenceGroupCreate(syntax, coOperatorNull);
-    coOperator operator = coOperatorAlloc();
-    coPattern pattern = coPatternAlloc();
-    coElement element;
+    paPrecedenceGroup precedenceGroup = paPrecedenceGroupCreate(syntax, paOperatorNull);
+    paOperator operator = paOperatorAlloc();
+    paPattern pattern = paPatternAlloc();
+    paElement element;
     va_list ap;
     char *arg;
 
-    coOperatorInsertPattern(operator, pattern);
-    coOperatorSetType(operator, type);
-    coOperatorSetSym(operator, utSymCreate(name));
-    coSyntaxAppendOperator(syntax, operator);
-    coPrecedenceGroupAppendOperator(precedenceGroup, operator);
+    paOperatorInsertPattern(operator, pattern);
+    paOperatorSetType(operator, type);
+    paOperatorSetSym(operator, utSymCreate(name));
+    paSyntaxAppendOperator(syntax, operator);
+    paPrecedenceGroupAppendOperator(precedenceGroup, operator);
     va_start(ap, name); 
     arg = va_arg(ap, char *);
     while(arg != NULL) {
@@ -433,32 +433,32 @@ static coOperator operatorCreate(
 
 // Also check that all non-keywords are the identifier "expr".
 static void checkOperatorSyntax(
-    coOperator operator)
+    paOperator operator)
 {
-    coElement element;
+    paElement element;
     utSym exprSym = utSymCreate("expr");
 
-    coForeachPatternElement(coOperatorGetPattern(operator), element) {
-        if(coElementGetKeyword(element) == coKeywordNull &&
-                coElementGetSym(element) != exprSym) {
+    paForeachPatternElement(paOperatorGetPattern(operator), element) {
+        if(paElementGetKeyword(element) == paKeywordNull &&
+                paElementGetSym(element) != exprSym) {
             utError("Invalid element '%s' in operator %s.  Only strings and expr are allowed.",
-                utSymGetName(coElementGetSym(element)), coOperatorGetName(operator));
+                utSymGetName(paElementGetSym(element)), paOperatorGetName(operator));
         }
-    } coEndPatternElement;
+    } paEndPatternElement;
 }
 
 // Determine if the operator has two exprs side by side, with no keyword
 // between.  Also check that all non-keywords are the identifier "expr".
 static bool operatorConcatenatesExprs(
-    coOperator operator)
+    paOperator operator)
 {
-    coElement element;
+    paElement element;
     bool lastWasExpr = false;
     bool concatenatesExprs = false;
     bool hasKeywords = false;
 
-    coForeachPatternElement(coOperatorGetPattern(operator), element) {
-        if(coElementGetKeyword(element) == coKeywordNull) {
+    paForeachPatternElement(paOperatorGetPattern(operator), element) {
+        if(paElementGetKeyword(element) == paKeywordNull) {
             if(lastWasExpr) {
                 concatenatesExprs = true;
             }
@@ -466,52 +466,52 @@ static bool operatorConcatenatesExprs(
         } else {
             hasKeywords = true;
         }
-    } coEndPatternElement;
+    } paEndPatternElement;
     return !hasKeywords && concatenatesExprs;
 }
 
 // Determine the expression type and expected symbol of expressions matching the node
 // expression.
-static coExprType findNodeExprTypeAndSym(
-    coNodeExpr nodeExpr,
+static paExprType findNodeExprTypeAndSym(
+    paNodeExpr nodeExpr,
     utSym *symPtr)
 {
-    coExprType type;
+    paExprType type;
     utSym sym = utSymNull;
 
-    switch(coNodeExprGetType(nodeExpr)) {
-    case CO_NODEEXPR_IDENT:
-        type = CO_EXPR_IDENT;
-        sym = coIdentSym;
+    switch(paNodeExprGetType(nodeExpr)) {
+    case PA_NODEEXPR_IDENT:
+        type = PA_EXPR_IDENT;
+        sym = paIdentSym;
         break;
-    case CO_NODEEXPR_EXPR:
-        type = CO_EXPR_IDENT;
-        sym = coExprSym;
+    case PA_NODEEXPR_EXPR:
+        type = PA_EXPR_IDENT;
+        sym = paExprSym;
         break;
-    case CO_NODEEXPR_INTEGER:
-        type = CO_EXPR_VALUE;
-        sym = coIntegerSym;
+    case PA_NODEEXPR_INTEGER:
+        type = PA_EXPR_VALUE;
+        sym = paIntegerSym;
         break;
-    case CO_NODEEXPR_FLOAT:
-        type = CO_EXPR_VALUE;
-        sym = coFloatSym;
+    case PA_NODEEXPR_FLOAT:
+        type = PA_EXPR_VALUE;
+        sym = paFloatSym;
         break;
-    case CO_NODEEXPR_STRING:
-        type = CO_EXPR_VALUE;
-        sym = coStringSym;
+    case PA_NODEEXPR_STRING:
+        type = PA_EXPR_VALUE;
+        sym = paStringSym;
         break;
-    case CO_NODEEXPR_CHAR:
-        type = CO_EXPR_VALUE;
-        sym = coCharSym;
+    case PA_NODEEXPR_CHAR:
+        type = PA_EXPR_VALUE;
+        sym = paCharSym;
         break;
-    case CO_NODEEXPR_CONSTIDENT:
-        type = CO_EXPR_IDENT;
-        sym = coNodeExprGetSym(nodeExpr);
+    case PA_NODEEXPR_CONSTIDENT:
+        type = PA_EXPR_IDENT;
+        sym = paNodeExprGetSym(nodeExpr);
         break;
-    case CO_NODEEXPR_OPERATOR:
-    case CO_NODEEXPR_LISTOPERATOR:
-        type = CO_EXPR_OPERATOR;
-        sym = coNodeExprGetSym(nodeExpr);
+    case PA_NODEEXPR_OPERATOR:
+    case PA_NODEEXPR_LISTOPERATOR:
+        type = PA_EXPR_OPERATOR;
+        sym = paNodeExprGetSym(nodeExpr);
         break;
     default:
         utExit("Unknown node expr type");
@@ -521,95 +521,95 @@ static coExprType findNodeExprTypeAndSym(
 }
 
 // Create a new nodelist object.
-static coNodelist coNodelistCreate(
-    coNoderule noderule,
-    coExprType type,
+static paNodelist paNodelistCreate(
+    paNoderule noderule,
+    paExprType type,
     utSym sym)
 {
-    coNodelist nodelist = coNodelistAlloc();
+    paNodelist nodelist = paNodelistAlloc();
 
-    coNodelistSetType(nodelist, type);
-    coNodelistSetSym(nodelist, sym);
-    coNoderuleInsertNodelist(noderule, nodelist);
+    paNodelistSetType(nodelist, type);
+    paNodelistSetSym(nodelist, sym);
+    paNoderuleInsertNodelist(noderule, nodelist);
     return nodelist;
 }
 
 // Copy node expression from the source nodelist to the dest.
 static void copyNodeExprsToNodelist(
-    coNodelist source,
-    coNodelist dest)
+    paNodelist source,
+    paNodelist dest)
 {
-    coNodeExpr nodeExpr;
+    paNodeExpr nodeExpr;
 
-    coForeachNodelistNodeExpr(source, nodeExpr) {
-        coNodelistAppendNodeExpr(dest, nodeExpr);
-    } coEndNodelistNodeExpr;
+    paForeachNodelistNodeExpr(source, nodeExpr) {
+        paNodelistAppendNodeExpr(dest, nodeExpr);
+    } paEndNodelistNodeExpr;
 }
 
 // Add the sub-noderule's nodelists to this noderule's nodelists.
 static void addNoderuleNodlistsToNodelists(
-    coNoderule noderule,
-    coNoderule subNoderule)
+    paNoderule noderule,
+    paNoderule subNoderule)
 {
-    coNodelist nodelist, subNodelist;
-    coExprType type;
+    paNodelist nodelist, subNodelist;
+    paExprType type;
     utSym sym;
 
-    coForeachNoderuleNodelist(subNoderule, subNodelist) {
-        type = coNodelistGetType(subNodelist);
-        sym = coNodelistGetSym(subNodelist);
-        nodelist = coNoderuleFindNodelist(noderule, type, sym);
-        if(nodelist == coNodelistNull) {
-            nodelist = coNodelistCreate(noderule, type, sym);
+    paForeachNoderuleNodelist(subNoderule, subNodelist) {
+        type = paNodelistGetType(subNodelist);
+        sym = paNodelistGetSym(subNodelist);
+        nodelist = paNoderuleFindNodelist(noderule, type, sym);
+        if(nodelist == paNodelistNull) {
+            nodelist = paNodelistCreate(noderule, type, sym);
         }
         copyNodeExprsToNodelist(subNodelist, nodelist);
-    } coEndNoderuleNodelist;
+    } paEndNoderuleNodelist;
 }
 
 // Build a hash table of node expressions that can match an expression based on
 // expression type and symbol.  These are used to accelerate matching noderules to
 // expressions.
 static void buildNoderuleNodelists(
-    coNoderule noderule)
+    paNoderule noderule)
 {
-    coSyntax syntax = coNoderuleGetSyntax(noderule);
-    coNoderule subNoderule;
-    coNodeExpr nodeExpr;
-    coExprType type;
-    coNodelist nodelist;
+    paSyntax syntax = paNoderuleGetSyntax(noderule);
+    paNoderule subNoderule;
+    paNodeExpr nodeExpr;
+    paExprType type;
+    paNodelist nodelist;
     utSym sym;
 
-    coForeachNoderuleNodeExpr(noderule, nodeExpr) {
-        if(coNodeExprGetType(nodeExpr) == CO_NODEEXPR_NODERULE) {
-            subNoderule = coSyntaxFindNoderule(syntax, coNodeExprGetSym(nodeExpr));
-            if(!coNoderuleBuiltNodelist(subNoderule)) {
+    paForeachNoderuleNodeExpr(noderule, nodeExpr) {
+        if(paNodeExprGetType(nodeExpr) == PA_NODEEXPR_NODERULE) {
+            subNoderule = paSyntaxFindNoderule(syntax, paNodeExprGetSym(nodeExpr));
+            if(!paNoderuleBuiltNodelist(subNoderule)) {
                 buildNoderuleNodelists(subNoderule);
             }
             addNoderuleNodlistsToNodelists(noderule, subNoderule);
         } else {
             type = findNodeExprTypeAndSym(nodeExpr, &sym);
-            nodelist = coNoderuleFindNodelist(noderule, type, sym);
-            if(nodelist == coNodelistNull) {
-                nodelist = coNodelistCreate(noderule, type, sym);
+            nodelist = paNoderuleFindNodelist(noderule, type, sym);
+            if(nodelist == paNodelistNull) {
+                nodelist = paNodelistCreate(noderule, type, sym);
             }
-            coNodelistAppendNodeExpr(nodelist, nodeExpr);
+            paNodelistAppendNodeExpr(nodelist, nodeExpr);
         }
-    } coEndNoderuleNodeExpr;
+    } paEndNoderuleNodeExpr;
 }
 
 // Build a hash table of node expressions that can match an expression based on
 // expression type and symbol.  These are used to accelerate matching noderules to
 // expressions.
 static void syntaxBuildNodelists(
-    coSyntax syntax)
+    paSyntax syntax)
 {
-    coNoderule noderule;
+    paNoderule noderule;
 
-    coForeachSyntaxNoderule(syntax, noderule) {
-        if(!coNoderuleBuiltNodelist(noderule)) {
+    paForeachSyntaxNoderule(syntax, noderule) {
+        if(!paNoderuleBuiltNodelist(noderule)) {
             buildNoderuleNodelists(noderule);
         }
-    } coEndSyntaxNoderule;
+    } paEndSyntaxNoderule;
 }
 
 // Set the precedence value on all the operators in the syntax.  This should be
@@ -617,540 +617,540 @@ static void syntaxBuildNodelists(
 // concatenation operator, and check operator syntax.  Build a hash table of
 // node expressions that can match an expression based on expression type and
 // symbol.
-void coSetOperatorPrecedence(
-    coSyntax syntax)
+void paSetOperatorPrecedence(
+    paSyntax syntax)
 {
-    coPrecedenceGroup group;
-    coOperator operator;
-    coOperator concatenationOperator = coOperatorNull;
+    paPrecedenceGroup group;
+    paOperator operator;
+    paOperator concatenationOperator = paOperatorNull;
     uint32 precedence = 0;
 
-    for(group = coSyntaxGetLastPrecedenceGroup(syntax); group != coPrecedenceGroupNull;
-            group = coPrecedenceGroupGetPrevSyntaxPrecedenceGroup(group)) {
-        coPrecedenceGroupSetPrecedence(group, precedence);
+    for(group = paSyntaxGetLastPrecedenceGroup(syntax); group != paPrecedenceGroupNull;
+            group = paPrecedenceGroupGetPrevSyntaxPrecedenceGroup(group)) {
+        paPrecedenceGroupSetPrecedence(group, precedence);
         precedence++;
     }
-    coForeachSyntaxOperator(syntax, operator) {
+    paForeachSyntaxOperator(syntax, operator) {
         checkOperatorSyntax(operator);
         if(operatorConcatenatesExprs(operator)) {
-            if(concatenationOperator != coOperatorNull) {
+            if(concatenationOperator != paOperatorNull) {
                 utError("Operators %s and %s both concatenate exprs",
-                    coOperatorGetName(concatenationOperator), coOperatorGetName(operator));
+                    paOperatorGetName(concatenationOperator), paOperatorGetName(operator));
             }
             concatenationOperator = operator;
         }
-    } coEndSyntaxOperator;
-    coSyntaxSetConcatenationOperator(syntax, concatenationOperator);
+    } paEndSyntaxOperator;
+    paSyntaxSetConcatenationOperator(syntax, concatenationOperator);
     syntaxBuildNodelists(syntax);
 }
 
 // Determine if the expression is an operator expression with the operator name.
 static inline bool exprMatches(
-    coExpr expr,
+    paExpr expr,
     char *name)
 {
-    return coExprGetType(expr) == CO_EXPR_OPERATOR &&
-        !strcmp(coOperatorGetName(coExprGetOperator(expr)), name);
+    return paExprGetType(expr) == PA_EXPR_OPERATOR &&
+        !strcmp(paOperatorGetName(paExprGetOperator(expr)), name);
 }
 
 // Get the name of the statment.
 static inline char *getStatementName(
-    coStatement statement)
+    paStatement statement)
 {
-    return utSymGetName(coStateruleGetSym(coStatementGetStaterule(statement)));
+    return utSymGetName(paStateruleGetSym(paStatementGetStaterule(statement)));
 }
 
 // Extract before expression symbols.
 static void processBeforeExpr(
-    coStaterule staterule,
-    coExpr beforeExpr)
+    paStaterule staterule,
+    paExpr beforeExpr)
 {
-    coExpr identExpr;
+    paExpr identExpr;
     utSym sym;
 
     //identListExpr: ident | sequence[ident]
-    if(coExprGetType(beforeExpr) == CO_EXPR_IDENT) {
-        sym = coExprGetSym(beforeExpr);
-        coStateruleAppendBeforeSym(staterule, sym);
+    if(paExprGetType(beforeExpr) == PA_EXPR_IDENT) {
+        sym = paExprGetSym(beforeExpr);
+        paStateruleAppendBeforeSym(staterule, sym);
     } else {
-        coForeachExprExpr(beforeExpr, identExpr) {
-            sym = coExprGetSym(identExpr);
-            coStateruleAppendBeforeSym(staterule, sym);
-        } coEndExprExpr;
+        paForeachExprExpr(beforeExpr, identExpr) {
+            sym = paExprGetSym(identExpr);
+            paStateruleAppendBeforeSym(staterule, sym);
+        } paEndExprExpr;
     }
 }
 
 // Extract after expression symbols.
 static void processAfterExpr(
-    coStaterule staterule,
-    coExpr afterExpr)
+    paStaterule staterule,
+    paExpr afterExpr)
 {
-    coExpr identExpr;
+    paExpr identExpr;
     utSym sym;
 
     //identListExpr: ident | sequence[ident]
-    if(coExprGetType(afterExpr) == CO_EXPR_IDENT) {
-        sym = coExprGetSym(afterExpr);
-        coStateruleAppendAfterSym(staterule, sym);
+    if(paExprGetType(afterExpr) == PA_EXPR_IDENT) {
+        sym = paExprGetSym(afterExpr);
+        paStateruleAppendAfterSym(staterule, sym);
     } else {
-        coForeachExprExpr(afterExpr, identExpr) {
-            sym = coExprGetSym(identExpr);
-            coStateruleAppendAfterSym(staterule, sym);
-        } coEndExprExpr;
+        paForeachExprExpr(afterExpr, identExpr) {
+            sym = paExprGetSym(identExpr);
+            paStateruleAppendAfterSym(staterule, sym);
+        } paEndExprExpr;
     }
 }
 
 // Create an element from the element expression.
-coElement coElementCreate(
-    coSyntax syntax,
-    coPattern pattern,
-    coExpr elemExpr)
+paElement paElementCreate(
+    paSyntax syntax,
+    paPattern pattern,
+    paExpr elemExpr)
 {
     //elementExpr: STRING | ident
-    coElement element = coElementAlloc();
-    coExprType type = coExprGetType(elemExpr);
-    coNodeExpr nodeExpr;
-    coKeyword keyword;
+    paElement element = paElementAlloc();
+    paExprType type = paExprGetType(elemExpr);
+    paNodeExpr nodeExpr;
+    paKeyword keyword;
     vaValue value;
     utSym sym;
     char *text;
 
-    if(type == CO_EXPR_VALUE) {
-        value = coExprGetValue(elemExpr);
+    if(type == PA_EXPR_VALUE) {
+        value = paExprGetValue(elemExpr);
         if(vaValueGetType(value) != VA_STRING) {
             utExit("Invalid element expression");
         }
         sym = utSymCreate((char *)vaStringGetValue(vaValueGetStringVal(value)));
-        coElementSetIsKeyword(element, true);
-        coElementSetSym(element, sym);
-        keyword = coSyntaxFindKeyword(syntax, sym);
-        if(keyword == coKeywordNull) {
-            keyword = coKeywordAlloc();
-            coKeywordSetSym(keyword, sym);
-            coSyntaxAppendKeyword(syntax, keyword);
+        paElementSetIsKeyword(element, true);
+        paElementSetSym(element, sym);
+        keyword = paSyntaxFindKeyword(syntax, sym);
+        if(keyword == paKeywordNull) {
+            keyword = paKeywordAlloc();
+            paKeywordSetSym(keyword, sym);
+            paSyntaxAppendKeyword(syntax, keyword);
         }
-        coKeywordAppendElement(keyword, element);
-    } else if (type == CO_EXPR_IDENT) {
-        text = utSymGetName(coExprGetSym(elemExpr));
+        paKeywordAppendElement(keyword, element);
+    } else if (type == PA_EXPR_IDENT) {
+        text = utSymGetName(paExprGetSym(elemExpr));
         if(!strcmp(text, "expr")) {
-            nodeExpr = coTokenNodeExprCreate(CO_NODEEXPR_EXPR);
+            nodeExpr = paTokenNodeExprCreate(PA_NODEEXPR_EXPR);
         } else if(!strcmp(text, "ident")) {
-            nodeExpr = coTokenNodeExprCreate(CO_NODEEXPR_IDENT);
+            nodeExpr = paTokenNodeExprCreate(PA_NODEEXPR_IDENT);
         } else {
-            nodeExpr = coSubruleNodeExprCreate(text);
+            nodeExpr = paSubruleNodeExprCreate(text);
         }
-        coNodeExprSetLineNum(nodeExpr, coExprGetLineNum(elemExpr));
-        coElementSetNodeExpr(element, nodeExpr);
-        coElementSetSym(element, coExprGetSym(elemExpr));
+        paNodeExprSetLineNum(nodeExpr, paExprGetLineNum(elemExpr));
+        paElementSetNodeExpr(element, nodeExpr);
+        paElementSetSym(element, paExprGetSym(elemExpr));
     } else {
         utExit("Bad element expression");
     }
-    coPatternAppendElement(pattern, element);
+    paPatternAppendElement(pattern, element);
     return element;
 }
 
 // Create pattern object from the pattern expression.
-coPattern coPatternCreate(
-    coSyntax syntax,
-    coExpr patternExpr)
+paPattern paPatternCreate(
+    paSyntax syntax,
+    paExpr patternExpr)
 {
-    coPattern pattern = coPatternAlloc();
-    coExpr elemExpr;
+    paPattern pattern = paPatternAlloc();
+    paExpr elemExpr;
 
     //patternExpr: elementExpr | sequence[elementExpr]
     if(!exprMatches(patternExpr, "sequence")) {
-        coElementCreate(syntax, pattern, patternExpr);
+        paElementCreate(syntax, pattern, patternExpr);
     } else {
-        coForeachExprExpr(patternExpr, elemExpr) {
-            coElementCreate(syntax, pattern, elemExpr);
-        } coEndExprExpr;
+        paForeachExprExpr(patternExpr, elemExpr) {
+            paElementCreate(syntax, pattern, elemExpr);
+        } paEndExprExpr;
     }
     return pattern;
 }
 
 // Create a staterule.
-coStaterule coStateruleCreate(
-    coSyntax syntax,
-    coFuncptr handlerFuncptr,
+paStaterule paStateruleCreate(
+    paSyntax syntax,
+    paFuncptr handlerFuncptr,
     utSym name,
     bool hasBlock,
-    coExpr patternExpr)
+    paExpr patternExpr)
 {
-    coStaterule staterule = coStateruleAlloc();
-    coPattern pattern = coPatternCreate(syntax, patternExpr);
-    coElement element;
+    paStaterule staterule = paStateruleAlloc();
+    paPattern pattern = paPatternCreate(syntax, patternExpr);
+    paElement element;
 
-    coStateruleInsertPattern(staterule, pattern);
-    coStateruleSetSym(staterule, name);
-    coStateruleSetHandlerFuncptr(staterule, handlerFuncptr);
-    coStateruleSetHasBlock(staterule, hasBlock);
-    coForeachPatternElement(pattern, element) {
-        if(coElementIsKeyword(element)) {
-            coStateruleAppendSignature(staterule, coElementGetKeyword(element));
+    paStateruleInsertPattern(staterule, pattern);
+    paStateruleSetSym(staterule, name);
+    paStateruleSetHandlerFuncptr(staterule, handlerFuncptr);
+    paStateruleSetHasBlock(staterule, hasBlock);
+    paForeachPatternElement(pattern, element) {
+        if(paElementIsKeyword(element)) {
+            paStateruleAppendSignature(staterule, paElementGetKeyword(element));
         } else {
             // Apend NULL keywords where exprs go.
-            coStateruleAppendSignature(staterule, coKeywordNull);
+            paStateruleAppendSignature(staterule, paKeywordNull);
         }
-    } coEndPatternElement;
-    coSyntaxAppendStaterule(syntax, staterule);
+    } paEndPatternElement;
+    paSyntaxAppendStaterule(syntax, staterule);
     return staterule;
 }
 
 // Check a handler expression, and return the staterule id and it's handler sym.
 static void processHandlerExpr(
-    coStatement statement,
-    coExpr handlerExpr,
+    paStatement statement,
+    paExpr handlerExpr,
     utSym *identSym,
-    coExpr *handlerDotExpr,
-    coExpr *beforeExpr,
-    coExpr *afterExpr)
+    paExpr *handlerDotExpr,
+    paExpr *beforeExpr,
+    paExpr *afterExpr)
 {
-    coExpr statementExpr = handlerExpr;
-    coExpr identExpr;
+    paExpr statementExpr = handlerExpr;
+    paExpr identExpr;
 
     // handlerExpr: handler(statementExpr dotExpr) | statementExpr
     if(exprMatches(handlerExpr, "handler")) {
-        statementExpr = coExprGetFirstExpr(handlerExpr);
-        *handlerDotExpr = coExprGetNextExprExpr(statementExpr);
+        statementExpr = paExprGetFirstExpr(handlerExpr);
+        *handlerDotExpr = paExprGetNextExprExpr(statementExpr);
     }
 	// statementExpr: ident | before(ident identListExpr) | after(ident identListExpr)
-    *beforeExpr = coExprNull;
-    *afterExpr = coExprNull;
+    *beforeExpr = paExprNull;
+    *afterExpr = paExprNull;
     if(exprMatches(statementExpr, "before")) {
-        identExpr = coExprGetFirstExpr(statementExpr);
-        *beforeExpr = coExprGetNextExprExpr(identExpr);
+        identExpr = paExprGetFirstExpr(statementExpr);
+        *beforeExpr = paExprGetNextExprExpr(identExpr);
     } else if(exprMatches(statementExpr, "after")) {
-        identExpr = coExprGetFirstExpr(statementExpr);
-        *afterExpr = coExprGetNextExprExpr(identExpr);
+        identExpr = paExprGetFirstExpr(statementExpr);
+        *afterExpr = paExprGetNextExprExpr(identExpr);
     } else {
         identExpr = statementExpr;
     }
-    *identSym = coExprGetSym(identExpr);
+    *identSym = paExprGetSym(identExpr);
 }
 
 // Handler for basicStatement: "statement" handlerExpr ":" patternExpr
 static void basicStatementHandler(
-    coStatement statement,
+    paStatement statement,
     bool preDecent)
 {
-    coStaterule staterule;
-    coExpr handlerExpr = coStatementGetFirstExpr(statement);
-    coExpr patternExpr = coExprGetNextStatementExpr(handlerExpr);
-    coExpr beforeExpr, afterExpr, handlerDotExpr;
-    coFuncptr handlerFuncptr = coFuncptrNull;
-    coIdent ident;
+    paStaterule staterule;
+    paExpr handlerExpr = paStatementGetFirstExpr(statement);
+    paExpr patternExpr = paExprGetNextStatementExpr(handlerExpr);
+    paExpr beforeExpr, afterExpr, handlerDotExpr;
+    paFuncptr handlerFuncptr = paFuncptrNull;
+    paIdent ident;
     utSym identSym;
 
     processHandlerExpr(statement, handlerExpr, &identSym, &handlerDotExpr,
         &beforeExpr, &afterExpr);
-    if(handlerDotExpr != coExprNull) {
-        ident = coFindIdent(handlerDotExpr);
-        if(ident == coIdentNull) {
-            coExprError(handlerExpr, "Unable to find statement handler");
+    if(handlerDotExpr != paExprNull) {
+        ident = paFindIdent(handlerDotExpr);
+        if(ident == paIdentNull) {
+            paExprError(handlerExpr, "Unable to find statement handler");
         }
-        if(coIdentGetType(ident) != CO_IDENT_FUNCPTR) {
-            coExprError(handlerExpr, "Not a statement handler");
+        if(paIdentGetType(ident) != PA_IDENT_FUNCPTR) {
+            paExprError(handlerExpr, "Not a statement handler");
         }
         // TODO: type checking?
-        handlerFuncptr = coIdentGetFuncptr(ident);
+        handlerFuncptr = paIdentGetFuncptr(ident);
     }
-    staterule = coStateruleCreate(coCurrentSyntax, handlerFuncptr, identSym, false,
+    staterule = paStateruleCreate(paCurrentSyntax, handlerFuncptr, identSym, false,
         patternExpr);
-    if(beforeExpr != coExprNull) {
+    if(beforeExpr != paExprNull) {
         processBeforeExpr(staterule, beforeExpr);
     }
-    if(afterExpr != coExprNull) {
+    if(afterExpr != paExprNull) {
         processAfterExpr(staterule, afterExpr);
     }
 }
 
 // Handler for blockStatement: "blockstatement" usesExpr ":" patternExpr
 static void blockStatementHandler(
-    coStatement statement,
+    paStatement statement,
     bool preDecent)
 {
-    coStaterule staterule;
-    coExpr usesExpr = coStatementGetFirstExpr(statement);
-    coExpr patternExpr = coExprGetNextStatementExpr(usesExpr);
-    coExpr handlerExpr = usesExpr;
-    coExpr syntaxExpr, beforeExpr, afterExpr, handlerDotExpr;
-    coFuncptr handlerFuncptr = coFuncptrNull;
-    coIdent ident;
+    paStaterule staterule;
+    paExpr usesExpr = paStatementGetFirstExpr(statement);
+    paExpr patternExpr = paExprGetNextStatementExpr(usesExpr);
+    paExpr handlerExpr = usesExpr;
+    paExpr syntaxExpr, beforeExpr, afterExpr, handlerDotExpr;
+    paFuncptr handlerFuncptr = paFuncptrNull;
+    paIdent ident;
     utSym syntaxSym = utSymNull, identSym;
 
     // usesExpr: useSyntax(handlerExpr ident) | handlerExpr
     if(exprMatches(usesExpr, "useSyntax")) {
-        handlerExpr = coExprGetFirstExpr(usesExpr);
-        syntaxExpr = coExprGetNextExprExpr(handlerExpr);
-        syntaxSym = coExprGetSym(syntaxExpr);
+        handlerExpr = paExprGetFirstExpr(usesExpr);
+        syntaxExpr = paExprGetNextExprExpr(handlerExpr);
+        syntaxSym = paExprGetSym(syntaxExpr);
     }
     processHandlerExpr(statement, handlerExpr, &identSym, &handlerDotExpr,
         &beforeExpr, &afterExpr);
-    if(handlerDotExpr != coExprNull) {
-        ident = coFindIdent(handlerDotExpr);
-        if(ident == coIdentNull) {
-            coExprError(handlerDotExpr, "Statement handler not found");
+    if(handlerDotExpr != paExprNull) {
+        ident = paFindIdent(handlerDotExpr);
+        if(ident == paIdentNull) {
+            paExprError(handlerDotExpr, "Statement handler not found");
         }
-        handlerFuncptr = coIdentGetFuncptr(ident);
+        handlerFuncptr = paIdentGetFuncptr(ident);
     }
-    staterule = coStateruleCreate(coCurrentSyntax, handlerFuncptr, identSym, true,
+    staterule = paStateruleCreate(paCurrentSyntax, handlerFuncptr, identSym, true,
         patternExpr);
-    coStateruleSetSubSyntaxSym(staterule, syntaxSym);
-    if(beforeExpr != coExprNull) {
+    paStateruleSetSubSyntaxSym(staterule, syntaxSym);
+    if(beforeExpr != paExprNull) {
         processBeforeExpr(staterule, beforeExpr);
     }
-    if(afterExpr != coExprNull) {
+    if(afterExpr != paExprNull) {
         processAfterExpr(staterule, afterExpr);
     }
 }
 
-static coNodeExpr buildNodeExpr(coExpr expr);
+static paNodeExpr buildNodeExpr(paExpr expr);
 
 // Create an operator node expression from a rule expression.
-coNodeExpr coOperatorNodeExprCreate(
-    coExpr opExpr)
+paNodeExpr paOperatorNodeExprCreate(
+    paExpr opExpr)
 {
-    coNodeExpr opNodeExpr = coNodeExprAlloc();
-    coExpr identExpr = coExprGetFirstExpr(opExpr);
-    coExpr nodeListExpr = coExprGetNextExprExpr(identExpr);
-    coExpr nodeExpr;
+    paNodeExpr opNodeExpr = paNodeExprAlloc();
+    paExpr identExpr = paExprGetFirstExpr(opExpr);
+    paExpr nodeListExpr = paExprGetNextExprExpr(identExpr);
+    paExpr nodeExpr;
 
     // operator(ident nodeListExpr)
-    coNodeExprSetLineNum(opNodeExpr, coExprGetLineNum(opExpr));
-    coNodeExprSetType(opNodeExpr, CO_NODEEXPR_OPERATOR);
-    coNodeExprSetSym(opNodeExpr, coExprGetSym(identExpr));
+    paNodeExprSetLineNum(opNodeExpr, paExprGetLineNum(opExpr));
+    paNodeExprSetType(opNodeExpr, PA_NODEEXPR_OPERATOR);
+    paNodeExprSetSym(opNodeExpr, paExprGetSym(identExpr));
     // nodeListExpr: nodeExpr | sequence(nodeExpr)
     if(exprMatches(nodeListExpr, "sequence")) {
-        coForeachExprExpr(nodeListExpr, nodeExpr) {
-            coNodeExprAppendNodeExpr(opNodeExpr, buildNodeExpr(nodeExpr));
-        } coEndExprExpr;
+        paForeachExprExpr(nodeListExpr, nodeExpr) {
+            paNodeExprAppendNodeExpr(opNodeExpr, buildNodeExpr(nodeExpr));
+        } paEndExprExpr;
     } else {
-        coNodeExprAppendNodeExpr(opNodeExpr, buildNodeExpr(nodeListExpr));
+        paNodeExprAppendNodeExpr(opNodeExpr, buildNodeExpr(nodeListExpr));
     }
     return opNodeExpr;
 }
 
 // Create a list node expression from a rule expression.
-coNodeExpr coListNodeExprCreate(
-    coExpr opExpr)
+paNodeExpr paListNodeExprCreate(
+    paExpr opExpr)
 {
-    coNodeExpr listNodeExpr = coNodeExprAlloc();
-    coExpr identExpr = coExprGetFirstExpr(opExpr);
-    coExpr nodeExpr = coExprGetNextExprExpr(identExpr);
+    paNodeExpr listNodeExpr = paNodeExprAlloc();
+    paExpr identExpr = paExprGetFirstExpr(opExpr);
+    paExpr nodeExpr = paExprGetNextExprExpr(identExpr);
 
     // list(ident nodeExpr)
-    coNodeExprSetLineNum(listNodeExpr, coExprGetLineNum(opExpr));
-    coNodeExprSetType(listNodeExpr, CO_NODEEXPR_LISTOPERATOR);
-    coNodeExprSetSym(listNodeExpr, coExprGetSym(identExpr));
-    coNodeExprAppendNodeExpr(listNodeExpr, buildNodeExpr(nodeExpr));
+    paNodeExprSetLineNum(listNodeExpr, paExprGetLineNum(opExpr));
+    paNodeExprSetType(listNodeExpr, PA_NODEEXPR_LISTOPERATOR);
+    paNodeExprSetSym(listNodeExpr, paExprGetSym(identExpr));
+    paNodeExprAppendNodeExpr(listNodeExpr, buildNodeExpr(nodeExpr));
     return listNodeExpr;
 }
 
 // Build a node expression from the expression.
-static coNodeExpr buildNodeExpr(
-    coExpr expr)
+static paNodeExpr buildNodeExpr(
+    paExpr expr)
 {
-    coNodeExpr nodeExpr;
+    paNodeExpr nodeExpr;
     vaValue value;
     char *text;
 
     // nodeExpr: ident | operator(ident nodeListExpr) | list(ident nodeExpr)
-    if(coExprGetType(expr) == CO_EXPR_VALUE) {
-        value = coExprGetValue(expr);
+    if(paExprGetType(expr) == PA_EXPR_VALUE) {
+        value = paExprGetValue(expr);
         if(vaValueGetType(value) != VA_STRING) {
             utExit("Invalid element expression");
         }
-        nodeExpr = coTokenNodeExprCreate(CO_NODEEXPR_CONSTIDENT);
-        coNodeExprSetSym(nodeExpr,
+        nodeExpr = paTokenNodeExprCreate(PA_NODEEXPR_CONSTIDENT);
+        paNodeExprSetSym(nodeExpr,
             utSymCreate((char *)vaStringGetValue(vaValueGetStringVal(value))));
-    } else if(coExprGetType(expr) == CO_EXPR_IDENT) {
-        text = utSymGetName(coExprGetSym(expr));
+    } else if(paExprGetType(expr) == PA_EXPR_IDENT) {
+        text = utSymGetName(paExprGetSym(expr));
         if(!strcmp(text, "expr")) {
-            coExprError(expr, "Invalid used of 'expr' in noderule");
+            paExprError(expr, "Invalid used of 'expr' in noderule");
         }
         if(!strcmp(text, "ident")) {
-            nodeExpr = coTokenNodeExprCreate(CO_NODEEXPR_IDENT);
+            nodeExpr = paTokenNodeExprCreate(PA_NODEEXPR_IDENT);
         } else if(!strcmp(text, "string")) {
-            nodeExpr = coTokenNodeExprCreate(CO_NODEEXPR_STRING);
+            nodeExpr = paTokenNodeExprCreate(PA_NODEEXPR_STRING);
         } else if(!strcmp(text, "float")) {
-            nodeExpr = coTokenNodeExprCreate(CO_NODEEXPR_FLOAT);
+            nodeExpr = paTokenNodeExprCreate(PA_NODEEXPR_FLOAT);
         } else if(!strcmp(text, "integer")) {
-            nodeExpr = coTokenNodeExprCreate(CO_NODEEXPR_INTEGER);
+            nodeExpr = paTokenNodeExprCreate(PA_NODEEXPR_INTEGER);
         } else if(!strcmp(text, "char")) {
-            nodeExpr = coTokenNodeExprCreate(CO_NODEEXPR_CHAR);
+            nodeExpr = paTokenNodeExprCreate(PA_NODEEXPR_CHAR);
         } else {
-            return coSubruleNodeExprCreate(text);
+            return paSubruleNodeExprCreate(text);
         }
     } else if(exprMatches(expr, "operator")) {
-        return coOperatorNodeExprCreate(expr);
+        return paOperatorNodeExprCreate(expr);
     } else {
         utAssert(exprMatches(expr, "list"));
-        return coListNodeExprCreate(expr);
+        return paListNodeExprCreate(expr);
     }
-    coNodeExprSetLineNum(nodeExpr, coExprGetLineNum(expr));
+    paNodeExprSetLineNum(nodeExpr, paExprGetLineNum(expr));
     return nodeExpr;
 }
 
 // Create a Noderule object for matching node exprs.
-coNoderule coNoderuleCreate(
-    coSyntax syntax,
+paNoderule paNoderuleCreate(
+    paSyntax syntax,
     utSym sym,
-    coExpr ruleExpr)
+    paExpr ruleExpr)
 {
-    coNoderule noderule = coNoderuleAlloc();
-    coNodeExpr nodeExpr;
-    coExpr expr;
+    paNoderule noderule = paNoderuleAlloc();
+    paNodeExpr nodeExpr;
+    paExpr expr;
 
-    coNoderuleSetSym(noderule, sym);
-    coSyntaxAppendNoderule(syntax, noderule);
+    paNoderuleSetSym(noderule, sym);
+    paSyntaxAppendNoderule(syntax, noderule);
     if(exprMatches(ruleExpr, "or")) {
-        coForeachExprExpr(ruleExpr, expr) {
+        paForeachExprExpr(ruleExpr, expr) {
             nodeExpr = buildNodeExpr(expr);
-            coNoderuleAppendNodeExpr(noderule, nodeExpr);
-        } coEndExprExpr;
+            paNoderuleAppendNodeExpr(noderule, nodeExpr);
+        } paEndExprExpr;
     } else {
         nodeExpr = buildNodeExpr(ruleExpr);
-        coNoderuleAppendNodeExpr(noderule, nodeExpr);
+        paNoderuleAppendNodeExpr(noderule, nodeExpr);
     }
     return noderule;
 }
 
 // Handler for ruleStatement: ident ":" ruleExpr
 static void ruleStatementHandler(
-    coStatement statement,
+    paStatement statement,
     bool preDecent)
 {
     // statement ruleStatement: ident ":" ruleExpr
-    coExpr identExpr = coStatementGetFirstExpr(statement);
-    utSym sym = coExprGetSym(identExpr);
-    coExpr ruleExpr = coExprGetNextStatementExpr(identExpr);
+    paExpr identExpr = paStatementGetFirstExpr(statement);
+    utSym sym = paExprGetSym(identExpr);
+    paExpr ruleExpr = paExprGetNextStatementExpr(identExpr);
 
-    coNoderuleCreate(coCurrentSyntax, sym, ruleExpr);
+    paNoderuleCreate(paCurrentSyntax, sym, ruleExpr);
 }
 
 // Handler for groupStatement: "group"
 static void groupStatementHandler(
-    coStatement statement,
+    paStatement statement,
     bool preDecent)
 {
     if(preDecent) {
-        coCurrentPrecedenceGroup = coPrecedenceGroupCreate(coCurrentSyntax, coOperatorNull);
+        paCurrentPrecedenceGroup = paPrecedenceGroupCreate(paCurrentSyntax, paOperatorNull);
     } else {
-        coCurrentPrecedenceGroup = coPrecedenceGroupNull;
+        paCurrentPrecedenceGroup = paPrecedenceGroupNull;
     }
 }
 
 // Create a new operator object.
-coOperator coOperatorCreate(
-    coSyntax syntax, 
-    coPrecedenceGroup precedenceGroup,
-    coOperatorType type,
+paOperator paOperatorCreate(
+    paSyntax syntax, 
+    paPrecedenceGroup precedenceGroup,
+    paOperatorType type,
     utSym nameSym,
-    coPattern pattern)
+    paPattern pattern)
 {
-    coOperator operator = coOperatorAlloc();
+    paOperator operator = paOperatorAlloc();
 
-    coOperatorSetType(operator, type);
-    coOperatorSetSym(operator, nameSym);
-    coOperatorInsertPattern(operator, pattern);
-    coSyntaxAppendOperator(syntax, operator);
-    coPrecedenceGroupAppendOperator(precedenceGroup, operator);
+    paOperatorSetType(operator, type);
+    paOperatorSetSym(operator, nameSym);
+    paOperatorInsertPattern(operator, pattern);
+    paSyntaxAppendOperator(syntax, operator);
+    paPrecedenceGroupAppendOperator(precedenceGroup, operator);
     return operator;
 }
 
 // Handler for operators.
 static void operatorStatementHandler(
-    coStatement statement,
-    coOperatorType type)
+    paStatement statement,
+    paOperatorType type)
 {
-    coPrecedenceGroup precedenceGroup = coCurrentPrecedenceGroup;
-    coExpr identExpr = coStatementGetFirstExpr(statement);
-    coExpr patternExpr = coExprGetNextStatementExpr(identExpr);
-    coPattern pattern = coPatternCreate(coCurrentSyntax, patternExpr);
-    utSym nameSym = coExprGetSym(identExpr);
+    paPrecedenceGroup precedenceGroup = paCurrentPrecedenceGroup;
+    paExpr identExpr = paStatementGetFirstExpr(statement);
+    paExpr patternExpr = paExprGetNextStatementExpr(identExpr);
+    paPattern pattern = paPatternCreate(paCurrentSyntax, patternExpr);
+    utSym nameSym = paExprGetSym(identExpr);
 
     // statement leftStatement: "left" ident ":" patternExpr
-    if(precedenceGroup == coPrecedenceGroupNull) {
-        precedenceGroup = coPrecedenceGroupCreate(coCurrentSyntax, coOperatorNull);
+    if(precedenceGroup == paPrecedenceGroupNull) {
+        precedenceGroup = paPrecedenceGroupCreate(paCurrentSyntax, paOperatorNull);
     }
-    coOperatorCreate(coCurrentSyntax, precedenceGroup, type, nameSym, pattern);
+    paOperatorCreate(paCurrentSyntax, precedenceGroup, type, nameSym, pattern);
 }
 
 // Handler for leftStatement: "left" ident ":" patternExpr
 static void leftStatementHandler(
-    coStatement statement,
+    paStatement statement,
     bool preDecent)
 {
-    operatorStatementHandler(statement, CO_OP_LEFT);
+    operatorStatementHandler(statement, PA_OP_LEFT);
 }
 
 // Handler for rightStatement: "right" ident ":" patternExpr
 static void rightStatementHandler(
-    coStatement statement,
+    paStatement statement,
     bool preDecent)
 {
-    operatorStatementHandler(statement, CO_OP_RIGHT);
+    operatorStatementHandler(statement, PA_OP_RIGHT);
 }
 
 // Handler for mergeStatement: "merge" ident ":" patternExpr
 static void mergeStatementHandler(
-    coStatement statement,
+    paStatement statement,
     bool preDecent)
 {
-    operatorStatementHandler(statement, CO_OP_MERGE);
+    operatorStatementHandler(statement, PA_OP_MERGE);
 }
 
 // Handler for nonassociativeStatement: "nonassociative" ident ":" patternExpr
 static void nonassociativeStatementHandler(
-    coStatement statement,
+    paStatement statement,
     bool preDecent)
 {
-    operatorStatementHandler(statement, CO_OP_NONASSOCIATIVE);
+    operatorStatementHandler(statement, PA_OP_NONASSOCIATIVE);
 }
 
 // Check identifiers inthe node expression.
 static void checkNodeExpr(
-    coSyntax syntax,
-    coNodeExpr nodeExpr)
+    paSyntax syntax,
+    paNodeExpr nodeExpr)
 {
-    coNodeExpr subNodeExpr;
-    coOperator operator;
-    utSym sym = coNodeExprGetSym(nodeExpr);
+    paNodeExpr subNodeExpr;
+    paOperator operator;
+    utSym sym = paNodeExprGetSym(nodeExpr);
     uint32 numSubExpr = 0;
 
-    switch(coNodeExprGetType(nodeExpr)) {
-    case CO_NODEEXPR_NODERULE:
-        if(coSyntaxFindNoderule(syntax, sym) == coNoderuleNull) {
+    switch(paNodeExprGetType(nodeExpr)) {
+    case PA_NODEEXPR_NODERULE:
+        if(paSyntaxFindNoderule(syntax, sym) == paNoderuleNull) {
             utError("Noderule %s not defined", utSymGetName(sym));
         }
         break;
-    case CO_NODEEXPR_OPERATOR: case CO_NODEEXPR_LISTOPERATOR:
-        operator = coSyntaxFindOperator(syntax, sym);
-        if(operator == coOperatorNull) {
+    case PA_NODEEXPR_OPERATOR: case PA_NODEEXPR_LISTOPERATOR:
+        operator = paSyntaxFindOperator(syntax, sym);
+        if(operator == paOperatorNull) {
             utError("Noderule %s not defined", utSymGetName(sym));
         }
-        coForeachNodeExprNodeExpr(nodeExpr, subNodeExpr) {
+        paForeachNodeExprNodeExpr(nodeExpr, subNodeExpr) {
             checkNodeExpr(syntax, subNodeExpr);
             numSubExpr++;
-        } coEndNodeExprNodeExpr;
-        if(coNodeExprGetType(nodeExpr) == CO_NODEEXPR_OPERATOR) {
-            if(coOperatorGetType(operator) == CO_OP_MERGE) {
-                coNodeExprError(nodeExpr, "Expected non-list node expresssion for operator %s",
-                    coOperatorGetName(operator));
+        } paEndNodeExprNodeExpr;
+        if(paNodeExprGetType(nodeExpr) == PA_NODEEXPR_OPERATOR) {
+            if(paOperatorGetType(operator) == PA_OP_MERGE) {
+                paNodeExprError(nodeExpr, "Expected non-list node expresssion for operator %s",
+                    paOperatorGetName(operator));
             }
         } else {
-            if(coOperatorGetType(operator) != CO_OP_MERGE) {
-                coNodeExprError(nodeExpr, "Expected list expression for operator %s",
-                    coOperatorGetName(operator));
+            if(paOperatorGetType(operator) != PA_OP_MERGE) {
+                paNodeExprError(nodeExpr, "Expected list expression for operator %s",
+                    paOperatorGetName(operator));
             }
             if(numSubExpr != 1) {
-                coNodeExprError(nodeExpr, "List node expression has multiple sub-expressions");
+                paNodeExprError(nodeExpr, "List node expression has multiple sub-expressions");
             }
         }
         break;
-    case CO_NODEEXPR_INTEGER: case CO_NODEEXPR_FLOAT: case CO_NODEEXPR_STRING:
-    case CO_NODEEXPR_CHAR: case CO_NODEEXPR_EXPR: case CO_NODEEXPR_CONSTIDENT:
-    case CO_NODEEXPR_IDENT:
+    case PA_NODEEXPR_INTEGER: case PA_NODEEXPR_FLOAT: case PA_NODEEXPR_STRING:
+    case PA_NODEEXPR_CHAR: case PA_NODEEXPR_EXPR: case PA_NODEEXPR_CONSTIDENT:
+    case PA_NODEEXPR_IDENT:
         break;
     default:
         utExit("Unknown node expression type");
@@ -1159,79 +1159,79 @@ static void checkNodeExpr(
 
 // Check that identifiers in node expressions can be resolved.
 static void checkNoderules(
-    coSyntax syntax)
+    paSyntax syntax)
 {
-    coNoderule noderule;
-    coNodeExpr nodeExpr;
+    paNoderule noderule;
+    paNodeExpr nodeExpr;
 
-    coForeachSyntaxNoderule(syntax, noderule) {
-        coForeachNoderuleNodeExpr(noderule, nodeExpr) {
+    paForeachSyntaxNoderule(syntax, noderule) {
+        paForeachNoderuleNodeExpr(noderule, nodeExpr) {
             checkNodeExpr(syntax, nodeExpr);
-        } coEndNoderuleNodeExpr;
-    } coEndSyntaxNoderule;
+        } paEndNoderuleNodeExpr;
+    } paEndSyntaxNoderule;
 }
 
 // Handle the syntax statement.
 static void syntaxStatementHandler(
-    coStatement statement,
+    paStatement statement,
     bool preDecent)
 {
-    static coSyntax prevSyntax;
+    static paSyntax prevSyntax;
 
     if(preDecent) {
-        prevSyntax = coCurrentSyntax;
-        coCurrentSyntax = coSyntaxCreate(coExprGetSym(coStatementGetFirstExpr(statement)));
+        prevSyntax = paCurrentSyntax;
+        paCurrentSyntax = paSyntaxCreate(paExprGetSym(paStatementGetFirstExpr(statement)));
     } else {
-        coStatementDestroy(statement);
-        checkNoderules(coCurrentSyntax);
-        coSetOperatorPrecedence(coCurrentSyntax);
-        coCurrentSyntax = prevSyntax;
+        paStatementDestroy(statement);
+        checkNoderules(paCurrentSyntax);
+        paSetOperatorPrecedence(paCurrentSyntax);
+        paCurrentSyntax = prevSyntax;
     }
 }
 
 // Initialize global utSym values.
 static void initGlobalSyms(void)
 {
-    coIdentSym = utSymCreate("ident");
-    coIntegerSym = utSymCreate("integer");
-    coFloatSym = utSymCreate("float");
-    coStringSym = utSymCreate("string");
-    coBoolSym = utSymCreate("bool");
-    coExprSym = utSymCreate("expr");
-    coCharSym = utSymCreate("char");
+    paIdentSym = utSymCreate("ident");
+    paIntegerSym = utSymCreate("integer");
+    paFloatSym = utSymCreate("float");
+    paStringSym = utSymCreate("string");
+    paBoolSym = utSymCreate("bool");
+    paExprSym = utSymCreate("expr");
+    paCharSym = utSymCreate("char");
 }
 
 // Register functions to handle L42 core statements.
 static void registerL42Handlers(void)
 {
-    coBuiltinModule = coModuleCreate(coTopModule, utSymCreate("builtin"));
-    coFuncptrCreate(coBuiltinModule, utSymCreate("classStatementHandler"),
-        coClassStatementHandler);
-    coFuncptrCreate(coBuiltinModule, utSymCreate("defStatementHandler"),
-        coDefStatementHandler);
-    coFuncptrCreate(coBuiltinModule, utSymCreate("doStatementHandler"),
-        coDoStatementHandler);
-    coFuncptrCreate(coBuiltinModule, utSymCreate("whileStatementHandler"),
-        coWhileStatementHandler);
-    coFuncptrCreate(coBuiltinModule, utSymCreate("ifStatementHandler"),
-        coIfStatementHandler);
-    coFuncptrCreate(coBuiltinModule, utSymCreate("elseIfStatementHandler"),
-        coElseIfStatementHandler);
-    coFuncptrCreate(coBuiltinModule, utSymCreate("elseStatementHandler"),
-        coElseStatementHandler);
-    coFuncptrCreate(coBuiltinModule, utSymCreate("returnStatementHandler"),
-        coReturnStatementHandler);
-    coFuncptrCreate(coBuiltinModule, utSymCreate("enumStatementHandler"),
-        coEnumStatementHandler);
-    coFuncptrCreate(coBuiltinModule, utSymCreate("exprStatementHandler"),
-        coExprStatementHandler);
+    paBuiltinModule = paModuleCreate(paTopModule, utSymCreate("builtin"));
+    paFuncptrCreate(paBuiltinModule, utSymCreate("classStatementHandler"),
+        paClassStatementHandler);
+    paFuncptrCreate(paBuiltinModule, utSymCreate("defStatementHandler"),
+        paDefStatementHandler);
+    paFuncptrCreate(paBuiltinModule, utSymCreate("doStatementHandler"),
+        paDoStatementHandler);
+    paFuncptrCreate(paBuiltinModule, utSymCreate("whileStatementHandler"),
+        paWhileStatementHandler);
+    paFuncptrCreate(paBuiltinModule, utSymCreate("ifStatementHandler"),
+        paIfStatementHandler);
+    paFuncptrCreate(paBuiltinModule, utSymCreate("elseIfStatementHandler"),
+        paElseIfStatementHandler);
+    paFuncptrCreate(paBuiltinModule, utSymCreate("elseStatementHandler"),
+        paElseStatementHandler);
+    paFuncptrCreate(paBuiltinModule, utSymCreate("returnStatementHandler"),
+        paReturnStatementHandler);
+    paFuncptrCreate(paBuiltinModule, utSymCreate("enumStatementHandler"),
+        paEnumStatementHandler);
+    paFuncptrCreate(paBuiltinModule, utSymCreate("exprStatementHandler"),
+        paExprStatementHandler);
 }
 
 // Create objects representing built-in stuff, like statement patters and operators.
-void coCreateBuiltins(void)
+void paCreateBuiltins(void)
 {
-    coSyntax syntax = coSyntaxCreate(utSymCreate("syntaxStatement"));
-    coStaterule staterule;
+    paSyntax syntax = paSyntaxCreate(utSymCreate("syntaxStatement"));
+    paStaterule staterule;
 
     initGlobalSyms();
     registerL42Handlers();
@@ -1261,123 +1261,123 @@ void coCreateBuiltins(void)
 
     // usesExpr: useSyntax(handlerExpr ident) | handlerExpr
     noderuleCreate(syntax, "usesExpr",
-        opNodeExprCreate("useSyntax", coSubruleNodeExprCreate("handlerExpr"),
-            coTokenNodeExprCreate(CO_NODEEXPR_IDENT), coNodeExprNull),
-        coSubruleNodeExprCreate("handlerExpr"), coNodeExprNull);
+        opNodeExprCreate("useSyntax", paSubruleNodeExprCreate("handlerExpr"),
+            paTokenNodeExprCreate(PA_NODEEXPR_IDENT), paNodeExprNull),
+        paSubruleNodeExprCreate("handlerExpr"), paNodeExprNull);
     // handlerExpr: handler(statementExpr dotExpr) | statementExpr
     noderuleCreate(syntax, "handlerExpr",
-        opNodeExprCreate("handler", coSubruleNodeExprCreate("statementExpr"),
-            coSubruleNodeExprCreate("dotExpr"), coNodeExprNull),
-        coSubruleNodeExprCreate("statementExpr"), coNodeExprNull);
+        opNodeExprCreate("handler", paSubruleNodeExprCreate("statementExpr"),
+            paSubruleNodeExprCreate("dotExpr"), paNodeExprNull),
+        paSubruleNodeExprCreate("statementExpr"), paNodeExprNull);
     // dotExpr: ident | dot[ident]
-    noderuleCreate(syntax, "dotExpr", coTokenNodeExprCreate(CO_NODEEXPR_IDENT),
-        listNodeExprCreate("dot", coTokenNodeExprCreate(CO_NODEEXPR_IDENT)), coNodeExprNull);
+    noderuleCreate(syntax, "dotExpr", paTokenNodeExprCreate(PA_NODEEXPR_IDENT),
+        listNodeExprCreate("dot", paTokenNodeExprCreate(PA_NODEEXPR_IDENT)), paNodeExprNull);
     // statementExpr: IDENT | before(IDENT identListExpr) | after(IDENT identListExpr)
-    noderuleCreate(syntax, "statementExpr", coTokenNodeExprCreate(CO_NODEEXPR_IDENT),
-        opNodeExprCreate("before", coTokenNodeExprCreate(CO_NODEEXPR_IDENT),
-            coSubruleNodeExprCreate("identListExpr"), coNodeExprNull),
-        opNodeExprCreate("after", coTokenNodeExprCreate(CO_NODEEXPR_IDENT),
-            coSubruleNodeExprCreate("identListExpr"), coNodeExprNull), coNodeExprNull);
+    noderuleCreate(syntax, "statementExpr", paTokenNodeExprCreate(PA_NODEEXPR_IDENT),
+        opNodeExprCreate("before", paTokenNodeExprCreate(PA_NODEEXPR_IDENT),
+            paSubruleNodeExprCreate("identListExpr"), paNodeExprNull),
+        opNodeExprCreate("after", paTokenNodeExprCreate(PA_NODEEXPR_IDENT),
+            paSubruleNodeExprCreate("identListExpr"), paNodeExprNull), paNodeExprNull);
     // identListExpr: IDENT | sequence[IDENT]
-    noderuleCreate(syntax, "identListExpr", coTokenNodeExprCreate(CO_NODEEXPR_IDENT),
-        listNodeExprCreate("sequence", coTokenNodeExprCreate(CO_NODEEXPR_IDENT)),
-        coNodeExprNull);
+    noderuleCreate(syntax, "identListExpr", paTokenNodeExprCreate(PA_NODEEXPR_IDENT),
+        listNodeExprCreate("sequence", paTokenNodeExprCreate(PA_NODEEXPR_IDENT)),
+        paNodeExprNull);
     //ruleExpr: nodeExpr | or[nodeExpr]
-    noderuleCreate(syntax, "ruleExpr", coSubruleNodeExprCreate("nodeExpr"),
-        listNodeExprCreate("or", coSubruleNodeExprCreate("nodeExpr")), coNodeExprNull);
+    noderuleCreate(syntax, "ruleExpr", paSubruleNodeExprCreate("nodeExpr"),
+        listNodeExprCreate("or", paSubruleNodeExprCreate("nodeExpr")), paNodeExprNull);
     //nodeExpr: ident | string | operator(ident nodeListExpr) | list(ident nodeExpr)
-    noderuleCreate(syntax, "nodeExpr", coTokenNodeExprCreate(CO_NODEEXPR_IDENT),
-        coTokenNodeExprCreate(CO_NODEEXPR_STRING),
-        opNodeExprCreate("operator", coTokenNodeExprCreate(CO_NODEEXPR_IDENT),
-            coSubruleNodeExprCreate("nodeListExpr"), coNodeExprNull),
-        opNodeExprCreate("list", coTokenNodeExprCreate(CO_NODEEXPR_IDENT),
-            coSubruleNodeExprCreate("nodeExpr"), coNodeExprNull), coNodeExprNull);
+    noderuleCreate(syntax, "nodeExpr", paTokenNodeExprCreate(PA_NODEEXPR_IDENT),
+        paTokenNodeExprCreate(PA_NODEEXPR_STRING),
+        opNodeExprCreate("operator", paTokenNodeExprCreate(PA_NODEEXPR_IDENT),
+            paSubruleNodeExprCreate("nodeListExpr"), paNodeExprNull),
+        opNodeExprCreate("list", paTokenNodeExprCreate(PA_NODEEXPR_IDENT),
+            paSubruleNodeExprCreate("nodeExpr"), paNodeExprNull), paNodeExprNull);
     //nodeListExpr: nodeExpr | sequence(nodeExpr)
-    noderuleCreate(syntax, "nodeListExpr", coSubruleNodeExprCreate("nodeExpr"),
-        listNodeExprCreate("sequence", coSubruleNodeExprCreate("nodeExpr")),
-        coNodeExprNull);
+    noderuleCreate(syntax, "nodeListExpr", paSubruleNodeExprCreate("nodeExpr"),
+        listNodeExprCreate("sequence", paSubruleNodeExprCreate("nodeExpr")),
+        paNodeExprNull);
     //patternExpr: elementExpr | sequence[elementExpr]
-    noderuleCreate(syntax, "patternExpr", coSubruleNodeExprCreate("elementExpr"),
-        listNodeExprCreate("sequence", coSubruleNodeExprCreate("elementExpr")),
-        coNodeExprNull);
+    noderuleCreate(syntax, "patternExpr", paSubruleNodeExprCreate("elementExpr"),
+        listNodeExprCreate("sequence", paSubruleNodeExprCreate("elementExpr")),
+        paNodeExprNull);
     //elementExpr: STRING | IDENT
-    noderuleCreate(syntax, "elementExpr", coTokenNodeExprCreate(CO_NODEEXPR_STRING),
-        coTokenNodeExprCreate(CO_NODEEXPR_IDENT), coNodeExprNull);
+    noderuleCreate(syntax, "elementExpr", paTokenNodeExprCreate(PA_NODEEXPR_STRING),
+        paTokenNodeExprCreate(PA_NODEEXPR_IDENT), paNodeExprNull);
 
     //merge dot: expr '.' expr
-    operatorCreate(syntax, CO_OP_LEFT, "dot", "expr", ".", "expr", NULL);
+    operatorCreate(syntax, PA_OP_LEFT, "dot", "expr", ".", "expr", NULL);
     //nonassociative node: expr "(" expr ")"
-    operatorCreate(syntax, CO_OP_NONASSOCIATIVE, "operator", "expr", "(", "expr", ")", NULL);
+    operatorCreate(syntax, PA_OP_NONASSOCIATIVE, "operator", "expr", "(", "expr", ")", NULL);
     //nonassociative list: expr "[" expr "]"
-    operatorCreate(syntax, CO_OP_NONASSOCIATIVE, "list", "expr", "[", "expr", "]", NULL);
+    operatorCreate(syntax, PA_OP_NONASSOCIATIVE, "list", "expr", "[", "expr", "]", NULL);
     //merge sequence: expr expr # Operators without tokens are allowed
-    operatorCreate(syntax, CO_OP_MERGE, "sequence", "expr", "expr", NULL);
+    operatorCreate(syntax, PA_OP_MERGE, "sequence", "expr", "expr", NULL);
     //nonassociative before: expr "before" expr
-    operatorCreate(syntax, CO_OP_NONASSOCIATIVE, "before", "expr", "before", "expr", NULL);
+    operatorCreate(syntax, PA_OP_NONASSOCIATIVE, "before", "expr", "before", "expr", NULL);
     //nonassociative after: expr "after" expr
-    operatorCreate(syntax, CO_OP_NONASSOCIATIVE, "after", "expr", "after", "expr", NULL);
+    operatorCreate(syntax, PA_OP_NONASSOCIATIVE, "after", "expr", "after", "expr", NULL);
     //merge or: expr "|" expr
-    operatorCreate(syntax, CO_OP_MERGE, "or", "expr", "|", "expr", NULL);
+    operatorCreate(syntax, PA_OP_MERGE, "or", "expr", "|", "expr", NULL);
     //nonassociative handler: expr "handler" expr
-    operatorCreate(syntax, CO_OP_NONASSOCIATIVE, "handler", "expr", "handler", "expr", NULL);
+    operatorCreate(syntax, PA_OP_NONASSOCIATIVE, "handler", "expr", "handler", "expr", NULL);
     //nonassociative useSyntax: expr "uses" expr
-    operatorCreate(syntax, CO_OP_NONASSOCIATIVE, "useSyntax", "expr", "uses", "expr", NULL);
+    operatorCreate(syntax, PA_OP_NONASSOCIATIVE, "useSyntax", "expr", "uses", "expr", NULL);
 
-    coL42Syntax = coSyntaxCreate(utSymCreate("l42"));
-    staterule = stateruleCreate(coL42Syntax, syntaxStatementHandler, "syntaxStatement", true,
+    paL42Syntax = paSyntaxCreate(utSymCreate("l42"));
+    staterule = stateruleCreate(paL42Syntax, syntaxStatementHandler, "syntaxStatement", true,
         "syntax", "ident", NULL);
-    coStateruleSetSubSyntaxSym(staterule, coSyntaxGetSym(syntax));
-    coSetOperatorPrecedence(syntax);
+    paStateruleSetSubSyntaxSym(staterule, paSyntaxGetSym(syntax));
+    paSetOperatorPrecedence(syntax);
 
-    coPrintSyntax(coL42Syntax);
-    coPrintSyntax(syntax);
+    paPrintSyntax(paL42Syntax);
+    paPrintSyntax(syntax);
 }
 
 // Parse a source file or string.
-static coModule parseSource(
-    coModule outerModule,
+static paModule parseSource(
+    paModule outerModule,
     utSym moduleName)
 {
-    coLineNum = 0;
-    coCurrentPrecedenceGroup = coPrecedenceGroupNull;
-    return coParse(outerModule, moduleName);
+    paLineNum = 0;
+    paCurrentPrecedenceGroup = paPrecedenceGroupNull;
+    return paParse(outerModule, moduleName);
 }
 
 // Parse a command definition file.
-coModule coParseSourceFile(
-    coModule outerModule,
+paModule paParseSourceFile(
+    paModule outerModule,
     char *fileName)
 {
-    coModule module;
+    paModule module;
     utSym sym;
-    coFile = fopen(fileName, "r");
+    paFile = fopen(fileName, "r");
 
-    if(coFile == NULL) {
+    if(paFile == NULL) {
         fprintf(stderr, "Unable to open file %s\n", fileName);
-        return coModuleNull;
+        return paModuleNull;
     }
     sym = utSymCreate(utReplaceSuffix(fileName, ""));
     module = parseSource(outerModule, sym);
-    if(module == coModuleNull) {
-        fclose(coFile);
-        coFile = NULL;
-        return coModuleNull;
+    if(module == paModuleNull) {
+        fclose(paFile);
+        paFile = NULL;
+        return paModuleNull;
     }
-    fclose(coFile);
-    coFile = NULL;
+    fclose(paFile);
+    paFile = NULL;
     return module;
 }
 
 // Parse a string as a source file.  The returned module has no identifier,
 // which means it should be in the top level name space.
-coModule coParseCommand(void)
+paModule paParseCommand(void)
 {
-    coModule module;
+    paModule module;
 
-    coFile = NULL;
-    module = parseSource(coTopModule, utSymNull);
-    if(module == coModuleNull) {
-        return coModuleNull;
+    paFile = NULL;
+    module = parseSource(paTopModule, utSymNull);
+    if(module == paModuleNull) {
+        return paModuleNull;
     }
     return module;
 }

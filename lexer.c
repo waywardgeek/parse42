@@ -7,20 +7,20 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <ctype.h>
-#include "co.h"
+#include "pa.h"
 
-static uchar *coLine;
-static uchar *coText;
-static size_t coTextSize, coTextPos;
-static uint32 coParenDepth, coBracketDepth, coBraceDepth;
-static bool coLastWasNewline;
-static uint32 coIndentDepth;
-static coToken coLastToken;
-static uint32 coPendingEndTokens;
+static uchar *paLine;
+static uchar *paText;
+static size_t paTextSize, paTextPos;
+static uint32 paParenDepth, paBracketDepth, paBraceDepth;
+static bool paLastWasNewline;
+static uint32 paIndentDepth;
+static paToken paLastToken;
+static uint32 paPendingEndTokens;
 
 // Print out an error message and exit.
-void coError(
-    coToken token,
+void paError(
+    paToken token,
     char *message,
     ...)
 {
@@ -30,70 +30,70 @@ void coError(
     va_start(ap, message);
     buff = utVsprintf((char *)message, ap);
     va_end(ap);
-    utError("Line %d, token \"%s\": %s", coTokenGetLineNum(token),
-            coTokenGetText(token), buff);
+    utError("Line %d, token \"%s\": %s", paTokenGetLineNum(token),
+            paTokenGetText(token), buff);
 }
 
 // Initialize lexer.
-void coLexerStart(void)
+void paLexerStart(void)
 {
-    coLine = NULL;
-    coTextSize = 256;
-    coText = (uchar *)calloc(coTextSize, sizeof(uchar));
-    coParenDepth = 0;
-    coBracketDepth = 0;
-    coBraceDepth = 0;
-    coIndentDepth = 0;
-    coLastWasNewline = true;
-    coLastToken = coTokenNull;
-    coPendingEndTokens = 0;
+    paLine = NULL;
+    paTextSize = 256;
+    paText = (uchar *)calloc(paTextSize, sizeof(uchar));
+    paParenDepth = 0;
+    paBracketDepth = 0;
+    paBraceDepth = 0;
+    paIndentDepth = 0;
+    paLastWasNewline = true;
+    paLastToken = paTokenNull;
+    paPendingEndTokens = 0;
 }
 
 // Stop the lexer.
-void coLexerStop(void)
+void paLexerStop(void)
 {
 }
 
 // Just print the contents of the token
-void coPrintToken(
-    coToken token)
+void paPrintToken(
+    paToken token)
 {
-    printf("%-6u ", coTokenGetLineNum(token));
-    switch(coTokenGetType(token)) {
-    case CO_TOK_INTEGER:
-        printf("INTEGER: %llu\n", coTokenGetIntVal(token));
+    printf("%-6u ", paTokenGetLineNum(token));
+    switch(paTokenGetType(token)) {
+    case PA_TOK_INTEGER:
+        printf("INTEGER: %llu\n", paTokenGetIntVal(token));
         break;
-    case CO_TOK_FLOAT:
-        printf("FLOAT: %g\n", coTokenGetFloatVal(token));
+    case PA_TOK_FLOAT:
+        printf("FLOAT: %g\n", paTokenGetFloatVal(token));
         break;
-    case CO_TOK_STRING:
-        printf("STRING: %s\n", coTokenGetText(token));
+    case PA_TOK_STRING:
+        printf("STRING: %s\n", paTokenGetText(token));
         break;
-    case CO_TOK_NEWLINE:
+    case PA_TOK_NEWLINE:
         printf("NEWLINE\n");
         break;
-    case CO_TOK_TAB:
+    case PA_TOK_TAB:
         printf("TAB\n");
         break;
-    case CO_TOK_CHAR:
-        printf("CHAR: %s\n", coTokenGetText(token));
+    case PA_TOK_CHAR:
+        printf("CHAR: %s\n", paTokenGetText(token));
         break;
-    case CO_TOK_IDENT:
-        printf("IDENT: %s\n", coTokenGetText(token));
+    case PA_TOK_IDENT:
+        printf("IDENT: %s\n", paTokenGetText(token));
         break;
-    case CO_TOK_OPERATOR:
-        printf("OPERATOR: %s\n", coTokenGetText(token));
+    case PA_TOK_OPERATOR:
+        printf("OPERATOR: %s\n", paTokenGetText(token));
         break;
-    case CO_TOK_COMMENT:
-        printf("COMMENT: %s\n", coTokenGetText(token));
+    case PA_TOK_COMMENT:
+        printf("COMMENT: %s\n", paTokenGetText(token));
         break;
-    case CO_TOK_KEYWORD:
-        printf("KEYWORD: %s\n", coTokenGetText(token));
+    case PA_TOK_KEYWORD:
+        printf("KEYWORD: %s\n", paTokenGetText(token));
         break;
-    case CO_TOK_BEGIN:
+    case PA_TOK_BEGIN:
         printf("BEGIN\n");
         break;
-    case CO_TOK_END:
+    case PA_TOK_END:
         printf("END\n");
         break;
     default:
@@ -102,56 +102,56 @@ void coPrintToken(
 }
 
 // Create a token object.
-static inline coToken coTokenCreate(
-    coTokenType type,
+static inline paToken paTokenCreate(
+    paTokenType type,
     uchar *text)
 {
-    coToken token = coTokenAlloc();
+    paToken token = paTokenAlloc();
 
-    coTokenSetType(token, type);
-    coTokenSetText(token, text, strlen((char *)text) + 1);
-    coTokenSetLineNum(token, coLineNum);
-    coLastToken = token;
+    paTokenSetType(token, type);
+    paTokenSetText(token, text, strlen((char *)text) + 1);
+    paTokenSetLineNum(token, paLineNum);
+    paLastToken = token;
     return token;
 }
 
 // Create a new integer token.
-static inline coToken coIntTokenCreate(
+static inline paToken paIntTokenCreate(
     uint64 intVal,
     uchar *text)
 {
-    coToken token = coTokenCreate(CO_TOK_INTEGER, text);
+    paToken token = paTokenCreate(PA_TOK_INTEGER, text);
 
-    coTokenSetIntVal(token, intVal);
+    paTokenSetIntVal(token, intVal);
     return token;
 }
 
 // Create a new float token.
-static inline coToken coFloatTokenCreate(
+static inline paToken paFloatTokenCreate(
     double floatVal,
     uchar *text)
 {
-    coToken token = coTokenCreate(CO_TOK_FLOAT, text);
+    paToken token = paTokenCreate(PA_TOK_FLOAT, text);
 
-    coTokenSetFloatVal(token, floatVal);
+    paTokenSetFloatVal(token, floatVal);
     return token;
 }
 
 // Create a new operator or keyword token.  Just check to see if the keyword is
 // owned by an operator or staterule.
-static inline coToken coKeywordTokenCreate(
-    coKeyword keyword,
+static inline paToken paKeywordTokenCreate(
+    paKeyword keyword,
     uchar *text)
 {
-    coPattern pattern = coElementGetPattern(coKeywordGetFirstElement(keyword));
-    coToken token;
+    paPattern pattern = paElementGetPattern(paKeywordGetFirstElement(keyword));
+    paToken token;
 
-    if(coPatternGetOperator(pattern) == coOperatorNull) {
-        token = coTokenCreate(CO_TOK_KEYWORD, text);
+    if(paPatternGetOperator(pattern) == paOperatorNull) {
+        token = paTokenCreate(PA_TOK_KEYWORD, text);
     } else {
-        token = coTokenCreate(CO_TOK_OPERATOR, text);
+        token = paTokenCreate(PA_TOK_OPERATOR, text);
     }
-    coTokenSetKeywordVal(token, keyword);
+    paTokenSetKeywordVal(token, keyword);
     return token;
 }
 
@@ -167,29 +167,29 @@ static uchar *skipSpace(
     return p;
 }
 
-// Add a character to coText from coLine.
+// Add a character to paText from paLine.
 static inline void addChar(void)
 {
-    int length = utf8FindLength(*coLine);
+    int length = utf8FindLength(*paLine);
 
-    if(coTextPos + length > coTextSize) {
-        coTextSize <<= 1;
-        coText = (uchar *)realloc(coText, coTextSize*sizeof(uchar));
+    if(paTextPos + length > paTextSize) {
+        paTextSize <<= 1;
+        paText = (uchar *)realloc(paText, paTextSize*sizeof(uchar));
     }
     while(length--) {
-        coText[coTextPos++] = *coLine++;
+        paText[paTextPos++] = *paLine++;
     }
 }
 
-// Add an ASCII character to coText from coLine.
+// Add an ASCII character to paText from paLine.
 static inline void addAscii(
     uchar c)
 {
-    if(coTextPos >= coTextSize) {
-        coTextSize <<= 1;
-        coText = (uchar *)realloc(coText, coTextSize*sizeof(uchar));
+    if(paTextPos >= paTextSize) {
+        paTextSize <<= 1;
+        paText = (uchar *)realloc(paText, paTextSize*sizeof(uchar));
     }
-    coText[coTextPos++] = c;
+    paText[paTextPos++] = c;
 }
 
 static inline void addChars(
@@ -203,10 +203,10 @@ static inline void addChars(
 // Try to parse a comment.
 static inline bool readComment(void)
 {
-    if(*coLine != '#') {
+    if(*paLine != '#') {
         return false;
     }
-    while(*coLine != '\0') {
+    while(*paLine != '\0') {
         addChar();
     }
     addAscii('\0');
@@ -214,9 +214,9 @@ static inline bool readComment(void)
 }
 
 // Try to read an integer, but if a parsed float is longer, do that.
-static inline coToken readNumber(void)
+static inline paToken readNumber(void)
 {
-    uchar c = *coLine;
+    uchar c = *paLine;
     char *floatTail, *intTail;
     double floatVal;
     uint64 intVal;
@@ -224,40 +224,40 @@ static inline coToken readNumber(void)
     if(!isdigit(c) && c != '.') {
         return 0;
     }
-    floatVal = strtod((char *)coLine, &floatTail);
-    if(floatTail == (char *)coLine) {
+    floatVal = strtod((char *)paLine, &floatTail);
+    if(floatTail == (char *)paLine) {
         return 0;
     }
-    intVal = strtoll((char *)coLine, &intTail, 0);
+    intVal = strtoll((char *)paLine, &intTail, 0);
     if(intTail >= floatTail) {
-        addChars(intTail - (char *)coLine);
+        addChars(intTail - (char *)paLine);
         addAscii('\0');
-        return coIntTokenCreate(intVal, coText);
+        return paIntTokenCreate(intVal, paText);
     }
-    addChars(floatTail - (char *)coLine);
+    addChars(floatTail - (char *)paLine);
     addAscii('\0');
-    return coFloatTokenCreate(floatVal, coText);
+    return paFloatTokenCreate(floatVal, paText);
 }
 
 // Try to read a string.
 static inline bool readString(void)
 {
-    if(*coLine != '"') {
+    if(*paLine != '"') {
         return false;
     }
-    coLine++; // Skip " character
-    while(*coLine != '\0' && *coLine != '"') {
-        if(*coLine == '\\') {
-            coLine++;
-            if(*coLine == 'n') {
+    paLine++; // Skip " character
+    while(*paLine != '\0' && *paLine != '"') {
+        if(*paLine == '\\') {
+            paLine++;
+            if(*paLine == 'n') {
                 addAscii('\n');
-                coLine++;
-            } else if(*coLine == 'r') {
+                paLine++;
+            } else if(*paLine == 'r') {
                 addAscii('\r');
-                coLine++;
-            } else if(*coLine == 't') {
+                paLine++;
+            } else if(*paLine == 't') {
                 addAscii('\t');
-                coLine++;
+                paLine++;
             } else {
                 addChar();
             }
@@ -265,107 +265,107 @@ static inline bool readString(void)
             addChar();
         }
     }
-    if(*coLine != '"') {
+    if(*paLine != '"') {
         utError("Invalid string termination");
     }
-    coLine++;
+    paLine++;
     addAscii('\0');
     return true;
 }
 
 // Try to read an operator.  We check up to 4-character long strings of ASCII
 // punctuation characters, and accept the longest found.
-static inline coToken readOperator(void)
+static inline paToken readOperator(void)
 {
-    coKeyword keyword;
+    paKeyword keyword;
     uchar opString[5];
     int length;
 
-    for(length = 0; length < 4 && ispunct(coLine[length]); length++) {
-        opString[length] = coLine[length];
+    for(length = 0; length < 4 && ispunct(paLine[length]); length++) {
+        opString[length] = paLine[length];
     }
     // Now check in the operator hash table for each size > 0, starting at
     // length.
     while(length) {
         opString[length] = '\0';
-        keyword = coSyntaxFindKeyword(coCurrentSyntax, utSymCreate((char *)opString));
-        if(keyword != coKeywordNull) {
-            coLine += length;
-            return coKeywordTokenCreate(keyword, opString);
+        keyword = paSyntaxFindKeyword(paCurrentSyntax, utSymCreate((char *)opString));
+        if(keyword != paKeywordNull) {
+            paLine += length;
+            return paKeywordTokenCreate(keyword, opString);
         }
         length--;
     }
-    return coTokenNull;
+    return paTokenNull;
 }
 
 // Try to read a keyword.
-static inline coToken lookForKeyword(void)
+static inline paToken lookForKeyword(void)
 {
-    coKeyword keyword = coSyntaxFindKeyword(coCurrentSyntax, utSymCreate((char *)coText));
+    paKeyword keyword = paSyntaxFindKeyword(paCurrentSyntax, utSymCreate((char *)paText));
 
-    if(keyword == coKeywordNull) {
-        return coTokenNull;
+    if(keyword == paKeywordNull) {
+        return paTokenNull;
     }
-    return coKeywordTokenCreate(keyword, coText);
+    return paKeywordTokenCreate(keyword, paText);
 }
 
 // Read an identifier.  This should work so long as the first character is alpha
 // numeric or is not a plain ASCII character (has it's high bit set).
 static inline bool readIdentifier(void)
 {
-    uchar c = *coLine;
+    uchar c = *paLine;
 
     if(!(c & 0x80) && !isalnum(c) && c != '\\') {
         return false;
     }
     while((c & 0x80) || isalnum(c) || c == '\\') {
         addChar();
-        c = *coLine;
+        c = *paLine;
     }
     addAscii('\0');
     return true;
 }
 
 // Read one token, now that we know we've got some text to parse.
-static coToken readToken(void)
+static paToken readToken(void)
 {
-    coToken token;
+    paToken token;
 
     if(readComment()){
-        return coTokenCreate(CO_TOK_COMMENT, coText);
+        return paTokenCreate(PA_TOK_COMMENT, paText);
     }
     if(readString()) {
-        return coTokenCreate(CO_TOK_STRING, coText);
+        return paTokenCreate(PA_TOK_STRING, paText);
     }
     token = readNumber();
-    if(token != coTokenNull) {
+    if(token != paTokenNull) {
         return token;
     }
     token = readOperator();
-    if(token != coTokenNull) {
+    if(token != paTokenNull) {
         return token;
     }
     if(readIdentifier()) {
         token = lookForKeyword();
-        if(token != coTokenNull) {
+        if(token != paTokenNull) {
             return token;
         }
-        return coTokenCreate(CO_TOK_IDENT, coText);
+        return paTokenCreate(PA_TOK_IDENT, paText);
     }
     // Must just be a single punctuation character
     addChar();
     addAscii('\0');
-    if(*coText == '\t') {
-        return coTokenCreate(CO_TOK_TAB, coText);
+    if(*paText == '\t') {
+        return paTokenCreate(PA_TOK_TAB, paText);
     }
-    return coTokenCreate(CO_TOK_CHAR, coText);
+    return paTokenCreate(PA_TOK_CHAR, paText);
 }
 
-// Determine if coLine is nothing but spaces, tabs, and a single backslash.
+// Determine if paLine is nothing but spaces, tabs, and a single backslash.
 static inline bool lineIsSlash(void)
 {
     bool hasBackslash = false;
-    uchar *p = coLine;
+    uchar *p = paLine;
     uchar c;
 
     while((c = *p++) != '\0') {
@@ -382,27 +382,27 @@ static inline bool lineIsSlash(void)
 }
 
 // Parse one token.
-static coToken lexRawToken(void)
+static paToken lexRawToken(void)
 {
-    coTextPos = 0;
-    if(coLine == NULL) {
-        coLine = utf8ReadLine(coFile);
-        if(coLine == NULL) {
-            return coTokenNull;
+    paTextPos = 0;
+    if(paLine == NULL) {
+        paLine = utf8ReadLine(paFile);
+        if(paLine == NULL) {
+            return paTokenNull;
         }
-        coLineNum++;
+        paLineNum++;
     }
     while(lineIsSlash()) {
-        coLine = utf8ReadLine(coFile);
-        if(coLine == NULL) {
-            return coTokenNull;
+        paLine = utf8ReadLine(paFile);
+        if(paLine == NULL) {
+            return paTokenNull;
         }
-        coLineNum++;
+        paLineNum++;
     }
-    coLine = skipSpace(coLine);
-    if(*coLine == '\0') {
-        coLine = NULL;
-        return coTokenCreate(CO_TOK_NEWLINE, (uchar *)"\n");
+    paLine = skipSpace(paLine);
+    if(*paLine == '\0') {
+        paLine = NULL;
+        return paTokenCreate(PA_TOK_NEWLINE, (uchar *)"\n");
     }
     return readToken();
 }
@@ -416,7 +416,7 @@ static inline bool lineIsBlank(void)
     if(lineIsSlash()) {
         return true;
     }
-    p = coLine;
+    p = paLine;
     while((c = *p++) != '\0') {
         if(c != ' ' && c != '\t') {
             return false;
@@ -428,51 +428,51 @@ static inline bool lineIsBlank(void)
 // Skip blank lines in the input.
 static void skipBlankLines(void)
 {
-    utAssert(coLine == NULL);
-    coLine = utf8ReadLine(coFile);
-    while(coLine != NULL && lineIsBlank()) {
-        coLineNum++;
-        coLine = utf8ReadLine(coFile);
+    utAssert(paLine == NULL);
+    paLine = utf8ReadLine(paFile);
+    while(paLine != NULL && lineIsBlank()) {
+        paLineNum++;
+        paLine = utf8ReadLine(paFile);
     }
-    if(coLine != NULL) {
-        coLineNum++;
+    if(paLine != NULL) {
+        paLineNum++;
     }
 }
 
 // Eat NEWLINE and TAB tokens inside parens, brackets, or braces.
-static coToken readTokenWithoutEmbeddedNewlines(void)
+static paToken readTokenWithoutEmbeddedNewlines(void)
 {
     // TODO: Should we use the group operators to determine when to drop NEWLINES?
-    coToken token;
-    coTokenType type;
+    paToken token;
+    paTokenType type;
     char *text;
 
     token = lexRawToken();
-    if(token == coTokenNull) {
+    if(token == paTokenNull) {
         return token;
     }
-    type = coTokenGetType(token);
+    type = paTokenGetType(token);
     // Eat newlines inside grouping operators
-    while((type == CO_TOK_NEWLINE || type == CO_TOK_TAB) &&
-            (coParenDepth > 0 || coBracketDepth > 0 || coBraceDepth > 0)) {
-        coTokenDestroy(token);
+    while((type == PA_TOK_NEWLINE || type == PA_TOK_TAB) &&
+            (paParenDepth > 0 || paBracketDepth > 0 || paBraceDepth > 0)) {
+        paTokenDestroy(token);
         token = lexRawToken();
-        type = coTokenGetType(token);
+        type = paTokenGetType(token);
     }
-    if(type == CO_TOK_OPERATOR) {
-        text = (char *)coTokenGetText(token);
+    if(type == PA_TOK_OPERATOR) {
+        text = (char *)paTokenGetText(token);
         if(!strcmp(text, "(")) {
-            coParenDepth++;
+            paParenDepth++;
         } else if(!strcmp(text, "[")) {
-            coBracketDepth++;
+            paBracketDepth++;
         } else if(!strcmp(text, "{")) {
-            coBraceDepth++;
+            paBraceDepth++;
         } else if(!strcmp(text, ")")) {
-            coParenDepth--;
+            paParenDepth--;
         } else if(!strcmp(text, "]")) {
-            coBracketDepth--;
+            paBracketDepth--;
         } else if(!strcmp(text, "}")) {
-            coBraceDepth--;
+            paBraceDepth--;
         }
     }
     return token;
@@ -486,18 +486,18 @@ static uint32 readTabTokens(void)
     uint32 numSpaces = 0;
 
     skipBlankLines();
-    if(coLine == NULL) {
+    if(paLine == NULL) {
         return 0;
     }
-    while(*coLine == '\t') {
+    while(*paLine == '\t') {
         numTabs++;
-        coLine++;
+        paLine++;
     }
-    while(*coLine == ' ') {
+    while(*paLine == ' ') {
         numSpaces++;
-        coLine++;
+        paLine++;
     }
-    if(*coLine == '\t') {
+    if(*paLine == '\t') {
         utError("Line %d: spaces before tab found.  It makes my brain hurt!.");
     }
     if((numSpaces & 0x3) != 0) {
@@ -507,40 +507,40 @@ static uint32 readTabTokens(void)
 }
 
 // Detect NEWLINE TAB* and use the tab depth to introduce BEGIN/END tokens.
-coToken coLex(void)
+paToken paLex(void)
 {
-    coToken token;
+    paToken token;
     uint32 depth;
 
-    if(coPendingEndTokens != 0) {
-        coPendingEndTokens--;
-        return coTokenCreate(CO_TOK_END, (uchar *)"");
+    if(paPendingEndTokens != 0) {
+        paPendingEndTokens--;
+        return paTokenCreate(PA_TOK_END, (uchar *)"");
     }
-    if(!coLastWasNewline) {
+    if(!paLastWasNewline) {
         token = readTokenWithoutEmbeddedNewlines();
-        if(token == coTokenNull) {
-            return coTokenNull;
+        if(token == paTokenNull) {
+            return paTokenNull;
         }
-        coLastWasNewline = coTokenGetType(token) == CO_TOK_NEWLINE;
+        paLastWasNewline = paTokenGetType(token) == PA_TOK_NEWLINE;
         return token;
     }
     depth = readTabTokens();
-    coLastWasNewline = false; // readTabTokens reads until non-NEWLINE
-    if(depth > coIndentDepth) {
-        if(depth > coIndentDepth + 1) {
-            coError(coLastToken, "Indentation too deep");
+    paLastWasNewline = false; // readTabTokens reads until non-NEWLINE
+    if(depth > paIndentDepth) {
+        if(depth > paIndentDepth + 1) {
+            paError(paLastToken, "Indentation too deep");
         }
-        coIndentDepth = depth;
-        return coTokenCreate(CO_TOK_BEGIN, (uchar *)"");
-    } else if(depth < coIndentDepth) {
-        coPendingEndTokens = coIndentDepth - depth - 1;
-        coIndentDepth = depth;
-        return coTokenCreate(CO_TOK_END, (uchar *)"");
+        paIndentDepth = depth;
+        return paTokenCreate(PA_TOK_BEGIN, (uchar *)"");
+    } else if(depth < paIndentDepth) {
+        paPendingEndTokens = paIndentDepth - depth - 1;
+        paIndentDepth = depth;
+        return paTokenCreate(PA_TOK_END, (uchar *)"");
     }
     token = readTokenWithoutEmbeddedNewlines();
-    if(token == coTokenNull) {
-        return coTokenNull;
+    if(token == paTokenNull) {
+        return paTokenNull;
     }
-    coLastWasNewline = coTokenGetType(token) == CO_TOK_NEWLINE;
+    paLastWasNewline = paTokenGetType(token) == PA_TOK_NEWLINE;
     return token;
 }
