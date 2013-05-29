@@ -272,7 +272,7 @@ static void printDictionary(
     uint8 type = *++bytes;
     bool firstTime = true;
 
-    printf("{");
+    printf("[|");
     while(type != 'E') {
         if(!firstTime) {
             printf(", ");
@@ -284,7 +284,7 @@ static void printDictionary(
         vaPrintEncodedValue(bytes);
         bytes += vaFindEncodedValueLength(bytes);
     }
-    printf("}");
+    printf("|]");
 }
 
 // Print raw bytes in hex.
@@ -683,9 +683,9 @@ void vaBencodeSelfTest(void)
         {"[1, 2, 3]", true, false},
         {"(a, 1, \"test\")", true, false},
         {"0b0123456789ABCDEF", true, false},
-        {"{a:1, b:2, 1.23:3.333}", true, false},
+        {"[|a:1, b:2, 1.23:3.333|]", true, false},
         {"\\false", true, false},
-        {"{[(0, 1), (2, 3)]:(a, b), {[4, 5, 6]:false}:\\true}", true, false},
+        {"[|[(0, 1), (2, 3)]:(a, b), [|[4, 5, 6]:false|]:\\true|]", true, false},
         {NULL, false, false},
     };
     vaTestType test;

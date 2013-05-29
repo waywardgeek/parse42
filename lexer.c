@@ -12,11 +12,9 @@
 static uchar *paLine;
 static uchar *paText;
 static size_t paTextSize, paTextPos;
-static uint32 paParenDepth, paBracketDepth, paBraceDepth;
+static uint32 paParenDepth, paBracketDepth;
 static bool paLastWasNewline;
-static uint32 paIndentDepth;
 static paToken paLastToken;
-static uint32 paPendingEndTokens;
 
 // Print out an error message and exit.
 void paError(
@@ -42,11 +40,8 @@ void paLexerStart(void)
     paText = (uchar *)calloc(paTextSize, sizeof(uchar));
     paParenDepth = 0;
     paBracketDepth = 0;
-    paBraceDepth = 0;
-    paIndentDepth = 0;
     paLastWasNewline = true;
     paLastToken = paTokenNull;
-    paPendingEndTokens = 0;
 }
 
 // Stop the lexer.
@@ -71,9 +66,6 @@ void paPrintToken(
         break;
     case PA_TOK_NEWLINE:
         printf("NEWLINE\n");
-        break;
-    case PA_TOK_TAB:
-        printf("TAB\n");
         break;
     case PA_TOK_CHAR:
         printf("CHAR: %s\n", paTokenGetText(token));
@@ -355,9 +347,6 @@ static paToken readToken(void)
     // Must just be a single punctuation character
     addChar();
     addAscii('\0');
-    if(*paText == '\t') {
-        return paTokenCreate(PA_TOK_TAB, paText);
-    }
     return paTokenCreate(PA_TOK_CHAR, paText);
 }
 
@@ -439,10 +428,9 @@ static void skipBlankLines(void)
     }
 }
 
-// Eat NEWLINE and TAB tokens inside parens, brackets, or braces.
-static paToken readTokenWithoutEmbeddedNewlines(void)
+// Parse a single token.
+paToken paLex(void)
 {
-    // TODO: Should we use the group operators to determine when to drop NEWLINES?
     paToken token;
     paTokenType type;
     char *text;
@@ -453,8 +441,7 @@ static paToken readTokenWithoutEmbeddedNewlines(void)
     }
     type = paTokenGetType(token);
     // Eat newlines inside grouping operators
-    while((type == PA_TOK_NEWLINE || type == PA_TOK_TAB) &&
-            (paParenDepth > 0 || paBracketDepth > 0 || paBraceDepth > 0)) {
+    while(type == PA_TOK_NEWLINE && (paParenDepth > 0 || paBracketDepth > 0)) {
         paTokenDestroy(token);
         token = lexRawToken();
         type = paTokenGetType(token);
@@ -465,82 +452,11 @@ static paToken readTokenWithoutEmbeddedNewlines(void)
             paParenDepth++;
         } else if(!strcmp(text, "[")) {
             paBracketDepth++;
-        } else if(!strcmp(text, "{")) {
-            paBraceDepth++;
         } else if(!strcmp(text, ")")) {
             paParenDepth--;
         } else if(!strcmp(text, "]")) {
             paBracketDepth--;
-        } else if(!strcmp(text, "}")) {
-            paBraceDepth--;
         }
     }
-    return token;
-}
-
-// Count TAB tokens in the input stream, throw them away, and return the number
-// thrown out.  This can only be called after finishing reading a line.
-static uint32 readTabTokens(void)
-{
-    uint32 numTabs = 0;
-    uint32 numSpaces = 0;
-
-    skipBlankLines();
-    if(paLine == NULL) {
-        return 0;
-    }
-    while(*paLine == '\t') {
-        numTabs++;
-        paLine++;
-    }
-    while(*paLine == ' ') {
-        numSpaces++;
-        paLine++;
-    }
-    if(*paLine == '\t') {
-        utError("Line %d: spaces before tab found.  It makes my brain hurt!.");
-    }
-    if((numSpaces & 0x3) != 0) {
-        utError("Line %d: Indentation must be by 4 spaces.  Try using tabs instead.");
-    }
-    return numTabs + (numSpaces >> 2);
-}
-
-// Detect NEWLINE TAB* and use the tab depth to introduce BEGIN/END tokens.
-paToken paLex(void)
-{
-    paToken token;
-    uint32 depth;
-
-    if(paPendingEndTokens != 0) {
-        paPendingEndTokens--;
-        return paTokenCreate(PA_TOK_END, (uchar *)"");
-    }
-    if(!paLastWasNewline) {
-        token = readTokenWithoutEmbeddedNewlines();
-        if(token == paTokenNull) {
-            return paTokenNull;
-        }
-        paLastWasNewline = paTokenGetType(token) == PA_TOK_NEWLINE;
-        return token;
-    }
-    depth = readTabTokens();
-    paLastWasNewline = false; // readTabTokens reads until non-NEWLINE
-    if(depth > paIndentDepth) {
-        if(depth > paIndentDepth + 1) {
-            paError(paLastToken, "Indentation too deep");
-        }
-        paIndentDepth = depth;
-        return paTokenCreate(PA_TOK_BEGIN, (uchar *)"");
-    } else if(depth < paIndentDepth) {
-        paPendingEndTokens = paIndentDepth - depth - 1;
-        paIndentDepth = depth;
-        return paTokenCreate(PA_TOK_END, (uchar *)"");
-    }
-    token = readTokenWithoutEmbeddedNewlines();
-    if(token == paTokenNull) {
-        return paTokenNull;
-    }
-    paLastWasNewline = paTokenGetType(token) == PA_TOK_NEWLINE;
     return token;
 }

@@ -1,14 +1,14 @@
-L42 data values are inspired by Python and JSON data formats.  They can be converted to text
-and back without any conversion losses.  A compact binary encoded representation is used to
-improve speed of P2P communication.  The motivation for this format is to have a single compact
-binary format with an exact ASCII representation identical to L42's data values, and to allow
-types to be represented.
+L42 data values are inspired by Python and JSON data formats.  They can be converted to
+text and back without any conversion losses.  A compact binary encoded representation is
+used to improve speed of P2P communication.  The motivation for this format is to have a
+single compact binary format with an exact UTF-8 representation identical to L42's data
+values, and to allow types to be represented.
 
 value: groupValue | number | string | identifier | 'true' | 'false' | 'null' | bytes
 groupValue: list | tuple | dictionary
 list: '[' values ']'
 tuple: '(' values ')'
-dictionary: '{' valuePairs '}'
+dictionary: '[|' valuePairs '|]'
 number: int | float | objectID
 int: (|-)[0-9]+ | 0x[0-9]+
 float: strtod format, including 0x format

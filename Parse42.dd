@@ -36,7 +36,6 @@ enum TokenType CO_TOK_
     COMMENT
     KEYWORD
     NEWLINE
-    TAB
     BEGIN
     END
 
