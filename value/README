@@ -8,7 +8,7 @@ value: groupValue | number | string | identifier | 'true' | 'false' | 'null' | b
 groupValue: list | tuple | dictionary
 list: '[' values ']'
 tuple: '(' values ')'
-dictionary: '[|' valuePairs '|]'
+dictionary: '<|' valuePairs '|>'
 number: int | float | objectID
 int: (|-)[0-9]+ | 0x[0-9]+
 float: strtod format, including 0x format

@@ -146,7 +146,7 @@ static void addDictionary(
     vaDictEntry dictEntry;
     bool firstTime = true;
 
-    addString("[|");
+    addString("<|");
     vaForeachDictionaryDictEntry(dictionary, dictEntry) {
         if(!firstTime) {
             addString(", ");
@@ -156,7 +156,7 @@ static void addDictionary(
         addChar(':');
         addValue(vaDictEntryGetValue(dictEntry));
     } vaEndDictionaryDictEntry;
-    addString("|]");
+    addString("|>");
 }
 
 // Add the blob to the string buffer.
@@ -583,7 +583,7 @@ static vaValue parseDictionary(
     (*bytesPtr) += 2;
     skipSpace(bytesPtr);
     c = **bytesPtr;
-    while(c != '|' || (*bytesPtr)[1] != ']') {
+    while(c != '|' || (*bytesPtr)[1] != '>') {
         key = parseValue(bytesPtr);
         skipSpace(bytesPtr);
         c = **bytesPtr;
@@ -597,8 +597,8 @@ static vaValue parseDictionary(
         c = **bytesPtr;
         if(c == ',') {
             (*bytesPtr)++;
-        } else if(c != '|' || (*bytesPtr)[1] != ']') {
-            utExit("Expected |] to end dictionary: %s", *bytesPtr);
+        } else if(c != '|' || (*bytesPtr)[1] != '>') {
+            utExit("Expected |> to end dictionary: %s", *bytesPtr);
         }
     }
     (*bytesPtr) += 2;
@@ -871,11 +871,12 @@ static vaValue parseValue(
     switch(c) {
     case '\0': utExit("Unexpected end of value expression"); return vaValueNull;
     case '[':
-        d = bytes[1];
-        if(d == '|') {
+        return parseList(bytesPtr);
+    case '<':
+        if(bytes[1] == '|') {
             return parseDictionary(bytesPtr);
         }
-        return parseList(bytesPtr);
+        break;
     case '(': return parseTuple(bytesPtr);
     case '"': return parseString(bytesPtr);
     case '0':

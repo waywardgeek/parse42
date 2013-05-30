@@ -20,7 +20,7 @@ all: valtest
 obj/%.o: %.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
 
-valtest: $(OBJS)
+valtest: vadatabase.c $(OBJS)
 	gcc $(LFLAGS) -DDD_DEBUG -o valtest $(OBJS) -lddutil-dbg
 
 depend: vadatabase.h vadatabase.c
@@ -29,6 +29,7 @@ depend: vadatabase.h vadatabase.c
 
 clean:
 	rm -rf obj vadatabase.c vadatabase.h depends valtest
+	mkdir -p obj
 
 vadatabase.c: vadatabase.h
 
