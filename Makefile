@@ -13,7 +13,6 @@ value/utf8.c \
 value/vadatabase.c \
 value/value.c \
 expression.c \
-funcptr.c \
 lexer.c \
 main.c \
 padatabase.c \

@@ -1,6 +1,6 @@
 #include "padatabase.h"
 
-typedef void (*paStatementHandler)(paStatement statement, bool preDecent);
+typedef void (*paStatementHandler)(paStatement statement);
 
 // Main routines
 paStatement paParseSourceFile(char *fileName);
@@ -25,9 +25,6 @@ void paPrintNoderule(paNoderule noderule);
 void paPrintOperator(paOperator operator);
 void paPrintPrecedenceGroup(paPrecedenceGroup precedenceGroup);
 void paPrintSyntax(paSyntax syntax);
-
-// Function pointer methods.
-paFuncptr paFuncptrCreate(utSym sym, paStatementHandler handler);
 
 // Globals
 extern paRoot paTheRoot;

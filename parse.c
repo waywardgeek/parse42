@@ -29,6 +29,7 @@
 
 static paStatement paOuterStatement, paPrevStatement;
 static bool paDebug;
+static paToken paNextBeginToken;
 
 // Print out an error message and exit.
 void paExprError(
@@ -46,14 +47,21 @@ void paExprError(
 }
 
 // Read one line of tokens.  It is up to the caller to destroy these tokens.
+// Read up to a newline or a BEGIN token.
 static bool readOneLine(void)
 {
     printf("Reading one line\n");
     paSyntax syntax;
     paStaterule staterule;
-    paToken token = paLex();
+    paToken token;
     utSym subSyntaxSym;
 
+    if(paNextBeginToken == paTokenNull) {
+        token = paLex();
+    } else {
+        token = paNextBeginToken;
+        paNextBeginToken = paTokenNull;
+    }
     if(token == paTokenNull) {
         return false;
     }
@@ -76,6 +84,10 @@ static bool readOneLine(void)
         }
         paTokenDestroy(token);
         token = paLex();
+        if(paTokenGetType(token) == PA_TOK_NEWLINE) {
+            paTokenDestroy(token);
+            token = paLex();
+        }
     }
     while(token != paTokenNull && paTokenGetType(token) == PA_TOK_END) {
         printf("Finished sub-statements\n");
@@ -95,9 +107,15 @@ static bool readOneLine(void)
         }
         paTokenDestroy(token);
         token = paLex();
+        if(paTokenGetType(token) == PA_TOK_NEWLINE) {
+            paTokenDestroy(token);
+            token = paLex();
+        }
     }
-    while(token != paTokenNull && paTokenGetType(token) != PA_TOK_NEWLINE) {
+    while(token != paTokenNull && paTokenGetType(token) != PA_TOK_NEWLINE &&
+            paTokenGetType(token) != PA_TOK_BEGIN) {
         if(paTokenGetType(token) == PA_TOK_CHAR) {
+            // Every character should be matched by some other token
             paError(token, "Illegal character in input");
         }
         paSyntaxAppendToken(paCurrentSyntax, token);
@@ -105,7 +123,11 @@ static bool readOneLine(void)
         token = paLex();
     }
     if(token != paTokenNull) {
-        paTokenDestroy(token); // We no longer need the NEWLINE token
+        if(paTokenGetType(token) == PA_TOK_BEGIN) {
+            paNextBeginToken = token;
+        } else {
+            paTokenDestroy(token); // We no longer need the NEWLINE token
+        }
     }
     return paSyntaxGetUsedToken(paCurrentSyntax) > 0;
 }
@@ -664,24 +686,23 @@ static void handleStatement(
 {
     paStaterule staterule = paStatementGetStaterule(statement);
     paStatement subStatement;
-    paFuncptr handlerFuncptr;
-    paStatementHandler handler = NULL;
+    paSyntax syntax;
+    paStatementHandler downHandler = NULL;
+    paStatementHandler upHandler = NULL;
 
-    if(staterule == paStateruleNull) {
-        return; // Only handle user statements
+    if(staterule != paStateruleNull) {
+        syntax = paStateruleGetSyntax(staterule);
+        downHandler = paSyntaxGetDownHandler(syntax);
+        upHandler = paSyntaxGetDownHandler(syntax);
     }
-    handlerFuncptr = paStateruleGetHandlerFuncptr(staterule);
-    if(handlerFuncptr != paFuncptrNull) {
-        handler = paFuncptrGetValue(handlerFuncptr);
-    }
-    if(handler != NULL && paStateruleHasBlock(staterule)) {
-        handler(statement, true);
+    if(downHandler != NULL && paStateruleHasBlock(staterule)) {
+        downHandler(statement);
     }
     paSafeForeachStatementStatement(statement, subStatement) {
         handleStatement(subStatement);
     } paEndSafeStatementStatement;
-    if(handler != NULL) {
-        handler(statement, false);
+    if(upHandler != NULL) {
+        upHandler(statement);
     }
 }
 
@@ -695,6 +716,7 @@ paStatement paParse(void)
     paCurrentSyntax = paL42Syntax;
     paOuterStatement = topStatement;
     paLexerStart();
+    paNextBeginToken = paTokenNull;
     paPrevStatement = paStatementNull;
     //paDebug = false;
     paDebug = true;

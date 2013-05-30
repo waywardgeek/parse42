@@ -35,7 +35,7 @@ schema parse
 enum OperatorType PA_OP_
     LEFT
     RIGHT
-    NONASSOCIATIVE
+    NONE
     MERGE
 
 enum TokenType PA_TOK_
@@ -64,10 +64,8 @@ enum NodeExprType PA_NODEEXPR_
     CONSTIDENT
 
 class Syntax
-
-// A compiled function
-class Funcptr
-    VoidPtr value
+    VoidPtr downHandler
+    VoidPtr upHandler
 
 class PrecedenceGroup
     uint32 precedence
@@ -79,7 +77,6 @@ class Staterule
     array sym beforeSym
     array sym afterSym
     array Keyword signature
-    Funcptr handlerFuncptr
 
 class Operator
     OperatorType type
@@ -115,7 +112,6 @@ class Token
         Keyword keywordVal: KEYWORD OPERATOR
 
 relationship Root Syntax hashed
-relationship Root Funcptr hashed
 relationship Syntax Staterule hashed signature mandatory
 relationship Syntax Operator hashed mandatory
 relationship Syntax Noderule hashed mandatory

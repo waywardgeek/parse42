@@ -14,7 +14,6 @@ static uchar *paText;
 static size_t paTextSize, paTextPos;
 static uint32 paParenDepth, paBracketDepth;
 static bool paLastWasNewline;
-static paToken paLastToken;
 
 // Print out an error message and exit.
 void paError(
@@ -41,7 +40,6 @@ void paLexerStart(void)
     paParenDepth = 0;
     paBracketDepth = 0;
     paLastWasNewline = true;
-    paLastToken = paTokenNull;
 }
 
 // Stop the lexer.
@@ -103,7 +101,6 @@ static inline paToken paTokenCreate(
     paTokenSetType(token, type);
     paTokenSetText(token, text, strlen((char *)text) + 1);
     paTokenSetLineNum(token, paLineNum);
-    paLastToken = token;
     return token;
 }
 
@@ -436,7 +433,9 @@ static inline bool lineIsBlank(void)
 // Skip blank lines in the input.
 static void skipBlankLines(void)
 {
-    utAssert(paLine == NULL);
+    if(paLine != NULL) {
+        return; // Nothing to skip.
+    }
     paLine = utf8ReadLine(paFile);
     while(paLine != NULL && lineIsBlank()) {
         paLineNum++;
@@ -456,7 +455,6 @@ paToken paLex(void)
 
     if(paLastWasNewline) {
         skipBlankLines();
-        paLastWasNewline = false;
     }
     token = lexRawToken();
     if(token == paTokenNull) {
@@ -469,8 +467,10 @@ paToken paLex(void)
         token = lexRawToken();
         type = paTokenGetType(token);
     }
+    // TODO: Deal with eating newlines between keywords and grouping operators, rather
+    // than just these.
+    text = (char *)paTokenGetText(token);
     if(type == PA_TOK_OPERATOR) {
-        text = (char *)paTokenGetText(token);
         if(!strcmp(text, "(")) {
             paParenDepth++;
         } else if(!strcmp(text, "[")) {
@@ -479,6 +479,17 @@ paToken paLex(void)
             paParenDepth--;
         } else if(!strcmp(text, "]")) {
             paBracketDepth--;
+        }
+    }
+    if(type == PA_TOK_CHAR) {
+        if(!strcmp(text, "{")) {
+            paTokenDestroy(token);
+            token = paTokenCreate(PA_TOK_BEGIN, (uchar *)"{");
+            skipBlankLines();
+        } else if(!strcmp(text, "}")) {
+            paTokenDestroy(token);
+            token = paTokenCreate(PA_TOK_END, (uchar *)"}");
+            skipBlankLines();
         }
     }
     paLastWasNewline = type == PA_TOK_NEWLINE;

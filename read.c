@@ -98,7 +98,6 @@ void paPrintStaterule(
     paStaterule staterule)
 {
     utSym subSyntaxSym = paStateruleGetSubSyntaxSym(staterule);
-    paFuncptr handlerFuncptr = paStateruleGetHandlerFuncptr(staterule);
     utSym sym;
 
     // TODO: print full use expression
@@ -119,9 +118,6 @@ void paPrintStaterule(
         paForeachStateruleAfterSym(staterule, sym) {
             printf(" %s", utSymGetName(sym));
         } paEndStateruleAfterSym;
-    }
-    if(handlerFuncptr != paFuncptrNull) {
-        printf(" handler %s", paFuncptrGetName(handlerFuncptr));
     }
     if(subSyntaxSym != utSymNull) {
         printf(" uses %s", utSymGetName(subSyntaxSym));
@@ -155,7 +151,7 @@ void paPrintOperator(
     switch(paOperatorGetType(operator)) {
     case PA_OP_LEFT: printf("left"); break;
     case PA_OP_RIGHT: printf("right"); break;
-    case PA_OP_NONASSOCIATIVE: printf("nonassociative"); break;
+    case PA_OP_NONE: printf("none"); break;
     case PA_OP_MERGE: printf("merge"); break;
     default:
         utExit("Unknown operator type");
@@ -344,7 +340,6 @@ static paElement elementCreate(
 // Create a new statement parsing rule.
 static paStaterule stateruleCreate(
     paSyntax syntax,
-    paStatementHandler handler,
     char *name,
     bool hasBlock,
     ...)
@@ -352,16 +347,11 @@ static paStaterule stateruleCreate(
     paStaterule staterule = paStateruleAlloc();
     paPattern pattern = paPatternAlloc();
     paElement element;
-    paFuncptr handlerFuncptr = paFuncptrNull;
     va_list ap;
     char *arg;
 
     paStateruleInsertPattern(staterule, pattern);
     paStateruleSetSym(staterule, utSymCreate(name));
-    if(handler != NULL) {
-        handlerFuncptr = paFuncptrCreate(utSymCreateFormatted("%sHandler", name), handler);
-        paStateruleSetHandlerFuncptr(staterule, handlerFuncptr);
-    }
     paStateruleSetHasBlock(staterule, hasBlock);
     va_start(ap, hasBlock); 
     arg = va_arg(ap, char *);
@@ -769,7 +759,6 @@ paPattern paPatternCreate(
 // Create a staterule.
 paStaterule paStateruleCreate(
     paSyntax syntax,
-    paFuncptr handlerFuncptr,
     utSym name,
     bool hasBlock,
     paExpr patternExpr)
@@ -780,7 +769,6 @@ paStaterule paStateruleCreate(
 
     paStateruleInsertPattern(staterule, pattern);
     paStateruleSetSym(staterule, name);
-    paStateruleSetHandlerFuncptr(staterule, handlerFuncptr);
     paStateruleSetHasBlock(staterule, hasBlock);
     paForeachPatternElement(pattern, element) {
         if(paElementIsKeyword(element)) {
@@ -795,23 +783,16 @@ paStaterule paStateruleCreate(
 }
 
 // Check a handler expression, and return the staterule id and it's handler sym.
-static void processHandlerExpr(
+static void processStatementExpr(
     paStatement statement,
-    paExpr handlerExpr,
+    paExpr statementExpr,
     utSym *identSym,
-    paExpr *handlerDotExpr,
     paExpr *beforeExpr,
     paExpr *afterExpr)
 {
-    paExpr statementExpr = handlerExpr;
     paExpr identExpr;
 
-    // handlerExpr: handler(statementExpr dotExpr) | statementExpr
-    if(exprMatches(handlerExpr, "handler")) {
-        statementExpr = paExprGetFirstExpr(handlerExpr);
-        *handlerDotExpr = paExprGetNextExprExpr(statementExpr);
-    }
-	// statementExpr: ident | before(ident identListExpr) | after(ident identListExpr)
+    // statementExpr: ident | before(ident identListExpr) | after(ident identListExpr)
     *beforeExpr = paExprNull;
     *afterExpr = paExprNull;
     if(exprMatches(statementExpr, "before")) {
@@ -832,24 +813,13 @@ static void basicStatementHandler(
     bool preDecent)
 {
     paStaterule staterule;
-    paExpr handlerExpr = paStatementGetFirstExpr(statement);
-    paExpr patternExpr = paExprGetNextStatementExpr(handlerExpr);
-    paExpr beforeExpr, afterExpr, handlerDotExpr;
-    paFuncptr handlerFuncptr = paFuncptrNull;
+    paExpr statementExpr = paStatementGetFirstExpr(statement);
+    paExpr patternExpr = paExprGetNextStatementExpr(statementExpr);
+    paExpr beforeExpr, afterExpr;
     utSym identSym;
 
-    processHandlerExpr(statement, handlerExpr, &identSym, &handlerDotExpr,
-        &beforeExpr, &afterExpr);
-    if(handlerDotExpr != paExprNull) {
-        identSym = paExprGetSym(handlerDotExpr);
-        handlerFuncptr = paRootFindFuncptr(paTheRoot, identSym);
-        if(handlerFuncptr == paFuncptrNull) {
-            paExprError(handlerExpr, "Unable to find statement handler %s",
-                utSymGetName(identSym));
-        }
-    }
-    staterule = paStateruleCreate(paCurrentSyntax, handlerFuncptr, identSym, false,
-        patternExpr);
+    processStatementExpr(statement, statementExpr, &identSym, &beforeExpr, &afterExpr);
+    staterule = paStateruleCreate(paCurrentSyntax, identSym, false, patternExpr);
     if(beforeExpr != paExprNull) {
         processBeforeExpr(staterule, beforeExpr);
     }
@@ -866,29 +836,18 @@ static void blockStatementHandler(
     paStaterule staterule;
     paExpr usesExpr = paStatementGetFirstExpr(statement);
     paExpr patternExpr = paExprGetNextStatementExpr(usesExpr);
-    paExpr handlerExpr = usesExpr;
-    paExpr syntaxExpr, beforeExpr, afterExpr, handlerDotExpr;
-    paFuncptr handlerFuncptr = paFuncptrNull;
-    utSym syntaxSym = utSymNull, identSym, handlerSym;
+    paExpr statementExpr = usesExpr;
+    paExpr syntaxExpr, beforeExpr, afterExpr;
+    utSym syntaxSym = utSymNull, identSym;
 
     // usesExpr: useSyntax(handlerExpr ident) | handlerExpr
     if(exprMatches(usesExpr, "useSyntax")) {
-        handlerExpr = paExprGetFirstExpr(usesExpr);
-        syntaxExpr = paExprGetNextExprExpr(handlerExpr);
+        statementExpr = paExprGetFirstExpr(usesExpr);
+        syntaxExpr = paExprGetNextExprExpr(statementExpr);
         syntaxSym = paExprGetSym(syntaxExpr);
     }
-    processHandlerExpr(statement, handlerExpr, &identSym, &handlerDotExpr,
-        &beforeExpr, &afterExpr);
-    if(handlerDotExpr != paExprNull) {
-        handlerSym = paExprGetSym(handlerDotExpr);
-        handlerFuncptr = paRootFindFuncptr(paTheRoot, handlerSym);
-        if(handlerFuncptr == paFuncptrNull) {
-            paExprError(handlerDotExpr, "Statement handler %s not found",
-                utSymGetName(handlerSym));
-        }
-    }
-    staterule = paStateruleCreate(paCurrentSyntax, handlerFuncptr, identSym, true,
-        patternExpr);
+    processStatementExpr(statement, statementExpr, &identSym, &beforeExpr, &afterExpr);
+    staterule = paStateruleCreate(paCurrentSyntax, identSym, true, patternExpr);
     paStateruleSetSubSyntaxSym(staterule, syntaxSym);
     if(beforeExpr != paExprNull) {
         processBeforeExpr(staterule, beforeExpr);
@@ -1094,12 +1053,12 @@ static void mergeStatementHandler(
     operatorStatementHandler(statement, PA_OP_MERGE);
 }
 
-// Handler for nonassociativeStatement: "nonassociative" ident ":" patternExpr
-static void nonassociativeStatementHandler(
+// Handler for noneStatement: "none" ident ":" patternExpr
+static void noneStatementHandler(
     paStatement statement,
     bool preDecent)
 {
-    operatorStatementHandler(statement, PA_OP_NONASSOCIATIVE);
+    operatorStatementHandler(statement, PA_OP_NONE);
 }
 
 // Check identifiers inthe node expression.
@@ -1202,43 +1161,35 @@ void paCreateBuiltins(void)
     paStaterule staterule;
 
     initGlobalSyms();
-    // statement basicStatement: "statement" handlerExpr ":" patternExpr
-    stateruleCreate(syntax, basicStatementHandler, "basicStatement", false, "statement",
-        "handlerExpr", ":", "patternExpr", NULL);
+    // statement basicStatement: "statement" statementExpr ":" patternExpr
+    stateruleCreate(syntax, "basicStatement", false, "statement",
+        "statementExpr", ":", "patternExpr", NULL);
     // statement blockStatement: "blockstatement" usesExpr ":" patternExpr
-    stateruleCreate(syntax, blockStatementHandler, "blockStatement", false,
+    stateruleCreate(syntax, "blockStatement", false,
         "blockstatement", "usesExpr", ":", "patternExpr", NULL);
     // statement ruleStatement: ident ":" ruleExpr
-    stateruleCreate(syntax, ruleStatementHandler, "ruleStatement", false, "ident", ":",
+    stateruleCreate(syntax, "ruleStatement", false, "ident", ":",
         "ruleExpr", NULL);
     // blockstatement groupStatement: "group"
-    stateruleCreate(syntax, groupStatementHandler, "groupStatement", true, "group", NULL);
+    stateruleCreate(syntax, "groupStatement", true, "group", NULL);
     // statement leftStatement: "left" ident ":" patternExpr
-    stateruleCreate(syntax, leftStatementHandler, "leftStatement", false, "left",
+    stateruleCreate(syntax, "leftStatement", false, "left",
         "ident", ":", "patternExpr", NULL);
     // statement rightStatement: "right" ident ":" patternExpr
-    stateruleCreate(syntax, rightStatementHandler, "rightStatement", false, "right",
+    stateruleCreate(syntax, "rightStatement", false, "right",
         "ident", ":", "patternExpr", NULL);
     // statement mergeStatement: "merge" ident ":" patternExpr
-    stateruleCreate(syntax, mergeStatementHandler, "mergeStatement", false, "merge",
+    stateruleCreate(syntax, "mergeStatement", false, "merge",
         "ident", ":", "patternExpr", NULL);
-    // statement nonassociativeStatement: "nonassociative" ident ":" patternExpr
-    stateruleCreate(syntax, nonassociativeStatementHandler, "nonassociativeStatement",
-        false, "nonassociative", "ident", ":", "patternExpr", NULL);
+    // statement noneStatement: "none" ident ":" patternExpr
+    stateruleCreate(syntax, "noneStatement",
+        false, "none", "ident", ":", "patternExpr", NULL);
 
-    // usesExpr: useSyntax(handlerExpr ident) | handlerExpr
+    // usesExpr: useSyntax(statementExpr ident) | statementExpr
     noderuleCreate(syntax, "usesExpr",
-        opNodeExprCreate("useSyntax", paSubruleNodeExprCreate("handlerExpr"),
+        opNodeExprCreate("useSyntax", paSubruleNodeExprCreate("statementExpr"),
             paTokenNodeExprCreate(PA_NODEEXPR_IDENT), paNodeExprNull),
-        paSubruleNodeExprCreate("handlerExpr"), paNodeExprNull);
-    // handlerExpr: handler(statementExpr dotExpr) | statementExpr
-    noderuleCreate(syntax, "handlerExpr",
-        opNodeExprCreate("handler", paSubruleNodeExprCreate("statementExpr"),
-            paSubruleNodeExprCreate("dotExpr"), paNodeExprNull),
         paSubruleNodeExprCreate("statementExpr"), paNodeExprNull);
-    // dotExpr: ident | dot[ident]
-    noderuleCreate(syntax, "dotExpr", paTokenNodeExprCreate(PA_NODEEXPR_IDENT),
-        listNodeExprCreate("dot", paTokenNodeExprCreate(PA_NODEEXPR_IDENT)), paNodeExprNull);
     // statementExpr: IDENT | before(IDENT identListExpr) | after(IDENT identListExpr)
     noderuleCreate(syntax, "statementExpr", paTokenNodeExprCreate(PA_NODEEXPR_IDENT),
         opNodeExprCreate("before", paTokenNodeExprCreate(PA_NODEEXPR_IDENT),
@@ -1273,25 +1224,23 @@ void paCreateBuiltins(void)
 
     //merge dot: expr '.' expr
     operatorCreate(syntax, PA_OP_LEFT, "dot", "expr", ".", "expr", NULL);
-    //nonassociative node: expr "(" expr ")"
-    operatorCreate(syntax, PA_OP_NONASSOCIATIVE, "operator", "expr", "(", "expr", ")", NULL);
-    //nonassociative list: expr "[" expr "]"
-    operatorCreate(syntax, PA_OP_NONASSOCIATIVE, "list", "expr", "[", "expr", "]", NULL);
+    //none node: expr "(" expr ")"
+    operatorCreate(syntax, PA_OP_NONE, "operator", "expr", "(", "expr", ")", NULL);
+    //none list: expr "[" expr "]"
+    operatorCreate(syntax, PA_OP_NONE, "list", "expr", "[", "expr", "]", NULL);
     //merge sequence: expr expr # Operators without tokens are allowed
     operatorCreate(syntax, PA_OP_MERGE, "sequence", "expr", "expr", NULL);
-    //nonassociative before: expr "before" expr
-    operatorCreate(syntax, PA_OP_NONASSOCIATIVE, "before", "expr", "before", "expr", NULL);
-    //nonassociative after: expr "after" expr
-    operatorCreate(syntax, PA_OP_NONASSOCIATIVE, "after", "expr", "after", "expr", NULL);
+    //none before: expr "before" expr
+    operatorCreate(syntax, PA_OP_NONE, "before", "expr", "before", "expr", NULL);
+    //none after: expr "after" expr
+    operatorCreate(syntax, PA_OP_NONE, "after", "expr", "after", "expr", NULL);
     //merge or: expr "|" expr
     operatorCreate(syntax, PA_OP_MERGE, "or", "expr", "|", "expr", NULL);
-    //nonassociative handler: expr "handler" expr
-    operatorCreate(syntax, PA_OP_NONASSOCIATIVE, "handler", "expr", "handler", "expr", NULL);
-    //nonassociative useSyntax: expr "uses" expr
-    operatorCreate(syntax, PA_OP_NONASSOCIATIVE, "useSyntax", "expr", "uses", "expr", NULL);
+    //none useSyntax: expr "uses" expr
+    operatorCreate(syntax, PA_OP_NONE, "useSyntax", "expr", "uses", "expr", NULL);
 
     paL42Syntax = paSyntaxCreate(utSymCreate("l42"));
-    staterule = stateruleCreate(paL42Syntax, syntaxStatementHandler, "syntaxStatement", true,
+    staterule = stateruleCreate(paL42Syntax, "syntaxStatement", true,
         "syntax", "ident", NULL);
     paStateruleSetSubSyntaxSym(staterule, paSyntaxGetSym(syntax));
     paSetOperatorPrecedence(syntax);

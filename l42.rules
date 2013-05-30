@@ -1,99 +1,99 @@
 // This file defines the core syntax of L42.
-blockstatement classStatement handler classStatementHandler: "class" ident
-blockstatement defStatement handler defStatementHandler: "def" defHeaderExpr
-blockstatement doStatement before whileStatement handler doStatementHandler: "do"
-blockstatement whileStatement handler whileStatementHandler: "while" boolExpr
-blockstatement ifStatement handler ifStatementHandler: "if" boolExpr
-blockstatement elseIfStatement after ifStatement elseIfStatement \
-    handler elseIfStatementHandler: "else" "if" boolExpr
-blockstatement elseStatement after ifStatement elseIfStatement \
-    handler elseStatementHandler: "else"
-statement returnStatement handler returnStatementHandler: "return"
-statement returnStatement handler returnStatementHandler: "return" anyExpr
-statement enumStatement handler enumStatementHandler: "enum" enumExpr
-statement exprStatement handler exprStatementHandler: anyExpr
+syntax l42 {
+    blockstatement classStatement: "class" ident
+    blockstatement defStatement: "def" defHeaderExpr
+    blockstatement doStatement before whileStatement: "do"
+    blockstatement whileStatement: "while" boolExpr
+    blockstatement ifStatement: "if" boolExpr
+    blockstatement elseIfStatement after ifStatement elseIfStatement: "else" "if" boolExpr
+    blockstatement elseStatement after ifStatement elseIfStatement: "else"
+    statement returnStatement: "return"
+    statement returnStatement: "return" anyExpr
+    statement enumStatement: "enum" enumExpr
+    statement exprStatement: anyExpr
 
-defHeaderExpr: defCallExpr | typeDecl(typeExpr defCallExpr)
-defCallExpr: emptyCall(ident) | call(ident varDeclListExpr)
-varDeclListExpr: varDeclExpr | comma[varDeclExpr]
-varDeclExpr: ident | typeDecl(typeExpr ident)
-typeExpr: ident | paren(varDeclExpr) | paren(comma[varDeclExpr]) | list(typeExpr)
-anyExpr: boolExpr | arithExpr
-boolExpr: accessExpr | "true" | "false" | comparisonExpr | logicalOpExpr \
-    | paren(boolExpr) | cond(boolExpr boolExpr boolExpr) | assign(lExpr boolExpr)
-comparisonExpr: lessThan(arithExpr arithExpr) | lessOrEqual(arithExpr arithExpr) \
-    | equal(boolExpr boolExpr) | equal(arithExpr arithExpr) \
-    | greaterThan(arithExpr arithExpr) | greaterOrEqual(arithExpr arithExpr) \
-    | notEqual(boolExpr boolExpr) | notEqual(arithExpr arithExpr)
-logicalOpExpr: and(boolExpr boolExpr) | or(boolExpr boolExpr) | xor(boolExpr boolExpr) \
-    | not(boolExpr)
-arithExpr: accessExpr | integer | float | string | arithOpExpr | bitOpExpr \
-    | paren(arithExpr) | cond(boolExpr arithExpr arithExpr) | assign(lExpr arithExpr) \
-    | comma[anyExpr] | list(anyExpr)
-arithOpExpr: power(arithExpr arithExpr) | preInc(arithExpr) \
-    | preDec(arithExpr) | postInc(arithExpr) | postDec(arithExpr) \
-    | mult(arithExpr arithExpr) \
-    | div(arithExpr arithExpr) | mod(arithExpr arithExpr) | add(arithExpr arithExpr) \
-    | sub(arithExpr arithExpr) | leftShift(arithExpr arithExpr) \
-    | rightShift(arithExpr arithExpr)
-bitOpExpr: complement(arithExpr) | bitAnd(arithExpr arithExpr) \
-    | bitXor(arithExpr arithExpr) | bitOr(arithExpr arithExpr)
-enumExpr: call(ident ident) | call(ident comma[ident])
-accessExpr: basicAccessExpr | callExpr
-lExpr: basicAccessExpr | paren(basicAccessExpr) | paren(comma[basicAccessExpr]) \
-    | typeDecl(typeExpr ident)
-basicAccessExpr: ident | index(accessExpr arithExpr) \
-    | slice(accessExpr arithExpr arithExpr) | dot(accessExpr ident)
-callExpr: emptyCall(ident) | call(ident anyExpr)
+    defHeaderExpr: defCallExpr | typeDecl(typeExpr defCallExpr)
+    defCallExpr: emptyCall(ident) | call(ident varDeclListExpr)
+    varDeclListExpr: varDeclExpr | comma[varDeclExpr]
+    varDeclExpr: ident | typeDecl(typeExpr ident)
+    typeExpr: ident | paren(varDeclExpr) | paren(comma[varDeclExpr]) | list(typeExpr)
+    anyExpr: boolExpr | arithExpr
+    boolExpr: accessExpr | "true" | "false" | comparisonExpr | logicalOpExpr \
+        | paren(boolExpr) | cond(boolExpr boolExpr boolExpr) | assign(lExpr boolExpr)
+    comparisonExpr: lessThan(arithExpr arithExpr) | lessOrEqual(arithExpr arithExpr) \
+        | equal(boolExpr boolExpr) | equal(arithExpr arithExpr) \
+        | greaterThan(arithExpr arithExpr) | greaterOrEqual(arithExpr arithExpr) \
+        | notEqual(boolExpr boolExpr) | notEqual(arithExpr arithExpr)
+    logicalOpExpr: and(boolExpr boolExpr) | or(boolExpr boolExpr) | xor(boolExpr boolExpr) \
+        | not(boolExpr)
+    arithExpr: accessExpr | integer | float | string | arithOpExpr | bitOpExpr \
+        | paren(arithExpr) | cond(boolExpr arithExpr arithExpr) | assign(lExpr arithExpr) \
+        | comma[anyExpr] | list(anyExpr)
+    arithOpExpr: power(arithExpr arithExpr) | preInc(arithExpr) \
+        | preDec(arithExpr) | postInc(arithExpr) | postDec(arithExpr) \
+        | mult(arithExpr arithExpr) \
+        | div(arithExpr arithExpr) | mod(arithExpr arithExpr) | add(arithExpr arithExpr) \
+        | sub(arithExpr arithExpr) | leftShift(arithExpr arithExpr) \
+        | rightShift(arithExpr arithExpr)
+    bitOpExpr: complement(arithExpr) | bitAnd(arithExpr arithExpr) \
+        | bitXor(arithExpr arithExpr) | bitOr(arithExpr arithExpr)
+    enumExpr: call(ident ident) | call(ident comma[ident])
+    accessExpr: basicAccessExpr | callExpr
+    lExpr: basicAccessExpr | paren(basicAccessExpr) | paren(comma[basicAccessExpr]) \
+        | typeDecl(typeExpr ident)
+    basicAccessExpr: ident | index(accessExpr arithExpr) \
+        | slice(accessExpr arithExpr arithExpr) | dot(accessExpr ident)
+    callExpr: emptyCall(ident) | call(ident anyExpr)
 
-precedence {
-    left dot: expr "." expr
-    left index: expr "[" expr "]"
-    left slice: expr "[" expr ":" expr "]"
-    left emptyCall: expr "(" ")"
-    left call: expr "(" expr ")"
-}
-right power: expr "**" expr
-precedence {
-    right complement: "~" expr
-    right preInc: "++" expr
-    right preDec: "--" expr
-    left postInc: expr "++"
-    left postDec: expr "--"
-}
-precedence {
-    left mult: expr "*" expr
-    left div: expr "/" expr
-    left mod: expr "%" expr
-}
-precedence {
-    left add: expr "+" expr
-    left sub: expr "-" expr
-}
-precedence {
-    left leftShift: expr "<<" expr
-    left rightShift: expr ">>" expr
-}
-left bitAnd: expr "&" expr
-left bitXor: expr "^" expr
-left bitOr: expr "|" expr
-precedence {
-    left equal: expr "==" expr
-    left notEqual: expr "!=" expr
-    left lessThan: expr "<" expr
-    left greaterThan: expr ">" expr
-    left lessOrEqual: expr "<=" expr
-    left greaterOrEqual: expr ">=" expr
-}
-right not: "!" expr
-left and: expr "&&" expr
-left xor: expr "^^" expr
-left or: expr "||" expr
-right cond: expr "?" expr ":" expr
-none typeDecl: expr expr
-right assign: expr "=" expr
-merge comma: expr "," expr
-precedence {
-    none paren: "(" expr ")"
-    none list: "[" expr "]"
+    group {
+        left dot: expr "." expr
+        left index: expr "[" expr "]"
+        left slice: expr "[" expr ":" expr "]"
+        left emptyCall: expr "(" ")"
+        left call: expr "(" expr ")"
+    }
+    right power: expr "**" expr
+    group {
+        right complement: "~" expr
+        right preInc: "++" expr
+        right preDec: "--" expr
+        left postInc: expr "++"
+        left postDec: expr "--"
+    }
+    group {
+        left mult: expr "*" expr
+        left div: expr "/" expr
+        left mod: expr "%" expr
+    }
+    group {
+        left add: expr "+" expr
+        left sub: expr "-" expr
+    }
+    group {
+        left leftShift: expr "<<" expr
+        left rightShift: expr ">>" expr
+    }
+    left bitAnd: expr "&" expr
+    left bitXor: expr "^" expr
+    left bitOr: expr "|" expr
+    group {
+        left equal: expr "==" expr
+        left notEqual: expr "!=" expr
+        left lessThan: expr "<" expr
+        left greaterThan: expr ">" expr
+        left lessOrEqual: expr "<=" expr
+        left greaterOrEqual: expr ">=" expr
+    }
+    right not: "!" expr
+    left and: expr "&&" expr
+    left xor: expr "^^" expr
+    left or: expr "||" expr
+    right cond: expr "?" expr ":" expr
+    none typeDecl: expr expr
+    right assign: expr "=" expr
+    merge comma: expr "," expr
+    group {
+        none paren: "(" expr ")"
+        none list: "[" expr "]"
+    }
 }
