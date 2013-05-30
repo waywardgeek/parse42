@@ -83,10 +83,10 @@ void paPrintToken(
         printf("KEYWORD: %s\n", paTokenGetText(token));
         break;
     case PA_TOK_BEGIN:
-        printf("BEGIN\n");
+        printf("{\n");
         break;
     case PA_TOK_END:
-        printf("END\n");
+        printf("}\n");
         break;
     default:
         utExit("Unknown token type");
@@ -195,11 +195,30 @@ static inline void addChars(
 // Try to parse a comment.
 static inline bool readComment(void)
 {
-    if(*paLine != '#') {
+    uint32 depth = 0;
+
+    if(*paLine != '/' || (paLine[1] != '/' && paLine[1] != '*')) {
         return false;
     }
-    while(*paLine != '\0') {
-        addChar();
+    paLine++;
+    if(*paLine == '/') {
+        paLine++;
+        while(*paLine != '\0') {
+            addChar();
+        }
+    } else {
+        depth++;
+        while(depth != 0) {
+            if(*paLine == '\0') {
+                addAscii('\n');
+                paLine = utf8ReadLine(paFile);
+            } else if(*paLine == '*' && paLine[1] == '/') {
+                paLine += 2;
+                depth--;
+            } else {
+                addChar();
+            }
+        }
     }
     addAscii('\0');
     return true;
@@ -435,6 +454,10 @@ paToken paLex(void)
     paTokenType type;
     char *text;
 
+    if(paLastWasNewline) {
+        skipBlankLines();
+        paLastWasNewline = false;
+    }
     token = lexRawToken();
     if(token == paTokenNull) {
         return token;
@@ -458,5 +481,6 @@ paToken paLex(void)
             paBracketDepth--;
         }
     }
+    paLastWasNewline = type == PA_TOK_NEWLINE;
     return token;
 }

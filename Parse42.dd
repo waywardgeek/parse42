@@ -1,17 +1,29 @@
 module Parse42 pa
 
+import Value
+
 typedef VoidPtr="NULL"
 typedef uchar="'\0'"
 
 // These are the data structures returned to the user.
 
+enum ExprType PA_EXPR_
+    VALUE
+    OPERATOR
+    IDENT
+
 class Root
 
 class Statement
-    sym type
+    bool isComment
+    va:String comment
 
 class Expr
-    sym type
+    ExprType type
+    uint32 lineNum
+    union type
+        va:Value value: VALUE
+        sym Sym: IDENT
 
 relationship Statement Statement doubly_linked cascade
 relationship Statement Expr doubly_linked cascade
@@ -20,13 +32,13 @@ relationship Expr Expr doubly_linked cascade
 // These data structures are used internally to represet parser rules and to parse input.
 schema parse
 
-enum OperatorType CO_OP_
+enum OperatorType PA_OP_
     LEFT
     RIGHT
     NONASSOCIATIVE
     MERGE
 
-enum TokenType CO_TOK_
+enum TokenType PA_TOK_
     INTEGER
     FLOAT
     STRING
@@ -39,7 +51,7 @@ enum TokenType CO_TOK_
     BEGIN
     END
 
-enum NodeExprType CO_NODEEXPR_
+enum NodeExprType PA_NODEEXPR_
     NODERULE
     OPERATOR
     LISTOPERATOR

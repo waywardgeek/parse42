@@ -1,18 +1,17 @@
 // This file defines the core syntax of L42.
-grouping: "{" "\n" "}"
-blockstatement classStatement handler builtin.classStatementHandler: "class" ident
-blockstatement defStatement handler builtin.defStatementHandler: "def" defHeaderExpr
-blockstatement doStatement before whileStatement handler builtin.doStatementHandler: "do"
-blockstatement whileStatement handler builtin.whileStatementHandler: "while" boolExpr
-blockstatement ifStatement handler builtin.ifStatementHandler: "if" boolExpr
+blockstatement classStatement handler classStatementHandler: "class" ident
+blockstatement defStatement handler defStatementHandler: "def" defHeaderExpr
+blockstatement doStatement before whileStatement handler doStatementHandler: "do"
+blockstatement whileStatement handler whileStatementHandler: "while" boolExpr
+blockstatement ifStatement handler ifStatementHandler: "if" boolExpr
 blockstatement elseIfStatement after ifStatement elseIfStatement \
-    handler builtin.elseIfStatementHandler: "else" "if" boolExpr
+    handler elseIfStatementHandler: "else" "if" boolExpr
 blockstatement elseStatement after ifStatement elseIfStatement \
-    handler builtin.elseStatementHandler: "else"
-statement returnStatement handler builtin.returnStatementHandler: "return"
-statement returnStatement handler builtin.returnStatementHandler: "return" anyExpr
-statement enumStatement handler builtin.enumStatementHandler: "enum" enumExpr
-statement exprStatement handler builtin.exprStatementHandler: anyExpr
+    handler elseStatementHandler: "else"
+statement returnStatement handler returnStatementHandler: "return"
+statement returnStatement handler returnStatementHandler: "return" anyExpr
+statement enumStatement handler enumStatementHandler: "enum" enumExpr
+statement exprStatement handler exprStatementHandler: anyExpr
 
 defHeaderExpr: defCallExpr | typeDecl(typeExpr defCallExpr)
 defCallExpr: emptyCall(ident) | call(ident varDeclListExpr)

@@ -1,10 +1,6 @@
-#include "co.h"
+#include "pa.h"
 
 paRoot paTheRoot;
-paNamespace paTopNamespace;
-paModule paTopModule;
-paStatement paTopStatement;
-paSyntax paL42Syntax;
 
 // Create the root module statement.
 void start(
@@ -18,9 +14,6 @@ void start(
     paDatabaseStart();
     vaValueStart();
     paTheRoot = paRootAlloc();
-    paTopModule = paModuleCreate(paModuleNull, utSymCreate("top"));
-    paTopNamespace = paIdentGetSubNamespace(paModuleGetIdent(paTopModule));
-    paTopStatement = paModuleStatementCreate(paStatementNull, paTopModule);
     paCreateBuiltins();
 }
 
@@ -36,18 +29,15 @@ int main(
     int argc,
     char *argv[])
 {
-    paModule module;
     int xArg = 1;
 
     start(argv[0]);
-    if(argc >= 2) {
-        for(xArg = 1; xArg < argc; xArg++) {
-            module = paParseSourceFile(paTopModule, argv[xArg]);
-            paPreprocessDataTypes(module);
-            //paGenerateCCode(module, utReplaceSuffix(utBaseName(argv[1]), ".c"));
-        }
-    } else {
-        paInterpreter();
+    if(argc < 2) {
+        printf("Usage: parse42 file...\n");
+        return 1;
+    }
+    for(xArg = 1; xArg < argc; xArg++) {
+        paParseSourceFile(argv[xArg]);
     }
     stop();
     return 0;

@@ -25,7 +25,7 @@
     grammar, and parsed just like any other.
 */
 
-#include "co.h"
+#include "pa.h"
 
 static paStatement paOuterStatement, paPrevStatement;
 static bool paDebug;
@@ -622,7 +622,7 @@ static paStatement buildCommentStatement(
 {
     paStatement statement = paStatementAlloc();
 
-    paStatementSetType(statement, PA_STATE_COMMENT);
+    paStatementSetIsComment(statement, true);
     paStatementAppendStatement(paOuterStatement, statement);
     printf("Comment statement: %s\n", vaStringGetValue(comment));
     paStatementSetComment(statement, comment);
@@ -648,7 +648,6 @@ static paStatement parseStatement(void)
     printf("Found staterule: ");
     paPrintStaterule(staterule);
     statement = paStatementAlloc();
-    paStatementSetType(statement, PA_STATE_USER);
     paStatementAppendStatement(paOuterStatement, statement);
     paStateruleAppendStatement(staterule, statement);
     parseExprs(statement);
@@ -688,17 +687,13 @@ static void handleStatement(
 
 // Parse an L42 file.  This is done one statement at a time.  Statements are
 // NEWLINE terminated.  Sub-statements are between BEGIN and END tokens.
-paModule paParse(
-    paModule outerModule,
-    utSym moduleName)
+paStatement paParse(void)
 {
-    paModule module = paModuleCreate(outerModule, moduleName);
-    paStatement moduleStatement, statement;
+    paStatement topStatement = paStatementCreate(paStatementNull, paStateruleNull);
+    paStatement statement;
 
     paCurrentSyntax = paL42Syntax;
-    statement = paModuleGetStatement(outerModule);
-    moduleStatement = paModuleStatementCreate(statement, module);
-    paOuterStatement = moduleStatement;
+    paOuterStatement = topStatement;
     paLexerStart();
     paPrevStatement = paStatementNull;
     //paDebug = false;
@@ -708,10 +703,10 @@ paModule paParse(
         paPrevStatement = parseStatement();
         destroyLineTokens();
     }
-    paForeachStatementStatement(moduleStatement, statement) {
+    paForeachStatementStatement(topStatement, statement) {
         handleStatement(statement);
     } paEndStatementStatement;
     paLexerStop();
     paPrintSyntax(paL42Syntax);
-    return module;
+    return topStatement;
 }

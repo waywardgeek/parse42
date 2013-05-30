@@ -46,42 +46,6 @@ void paPrintExpr(
     paExpr expr)
 {
     switch(paExprGetType(expr)) {
-    case PA_EXPR_TUPLE:
-    case PA_EXPR_LIST:
-    case PA_EXPR_CONDITIONAL:
-    case PA_EXPR_OR:
-    case PA_EXPR_AND:
-    case PA_EXPR_XOR:
-    case PA_EXPR_NOT:
-    case PA_EXPR_LESS_THAN:
-    case PA_EXPR_GREATER_THAN:
-    case PA_EXPR_EQUAL:
-    case PA_EXPR_GREATER_OR_EQUAL:
-    case PA_EXPR_LESS_OR_EQUAL:
-    case PA_EXPR_NOT_EQUAL:
-    case PA_EXPR_BITOR:
-    case PA_EXPR_BITXOR:
-    case PA_EXPR_BITAND:
-    case PA_EXPR_SHIFT_LEFT:
-    case PA_EXPR_SHIFT_RIGHT:
-    case PA_EXPR_ADD:
-    case PA_EXPR_SUBTRACT:
-    case PA_EXPR_COMPLIMENT:
-    case PA_EXPR_MULTIPLY:
-    case PA_EXPR_DIVIDE:
-    case PA_EXPR_MODULUS:
-    case PA_EXPR_NEGATE:
-    case PA_EXPR_POWER:
-    case PA_EXPR_INDEX:
-    case PA_EXPR_DOT:
-    case PA_EXPR_CALL:
-    case PA_EXPR_ASSIGN:
-    case PA_EXPR_PRE_PLUSPLUS:
-    case PA_EXPR_POST_PLUSPLUS:
-    case PA_EXPR_PRE_MINUSMINUS:
-    case PA_EXPR_POST_MINUSMINUS:
-        printf("Bill: finisih print expr\n");
-        break;
     case PA_EXPR_VALUE:
         vaPrintValue(paExprGetValue(expr));
         break;
@@ -103,45 +67,6 @@ paExpr paExprCreate(
     paExpr expr = paExprAlloc();
 
     paExprSetType(expr, type);
-    return expr;
-}
-
-// Create a unary expresion.
-paExpr paUnaryExprCreate(
-    paExprType type,
-    paExpr a)
-{
-    paExpr expr = paExprCreate(type);
-
-    paExprAppendExpr(expr, a);
-    return expr;
-}
-
-// Create a binary expr.
-paExpr paBinaryExprCreate(
-    paExprType type,
-    paExpr a,
-    paExpr b)
-{
-    paExpr expr = paExprCreate(type);
-
-    paExprAppendExpr(expr, a);
-    paExprAppendExpr(expr, b);
-    return expr;
-}
-
-// Create an expr with three children.
-paExpr paTrinaryExprCreate(
-    paExprType type,
-    paExpr a,
-    paExpr b,
-    paExpr c)
-{
-    paExpr expr = paExprCreate(type);
-
-    paExprAppendExpr(expr, a);
-    paExprAppendExpr(expr, b);
-    paExprAppendExpr(expr, c);
     return expr;
 }
 

@@ -1,11 +1,10 @@
-#include "co.h"
+#include "pa.h"
 
 FILE *paFile;
 // Must be set before parsing so that the parser knows where to add stuff.
 uint32 paFileSize, paLineNum;
-paSyntax paCurrentSyntax;
+paSyntax paL42Syntax, paCurrentSyntax;
 utSym paIdentSym, paIntegerSym, paFloatSym, paStringSym, paBoolSym, paCharSym, paExprSym;
-paModule paBuiltinModule;
 
 static paPrecedenceGroup paCurrentPrecedenceGroup;
 
@@ -360,8 +359,7 @@ static paStaterule stateruleCreate(
     paStateruleInsertPattern(staterule, pattern);
     paStateruleSetSym(staterule, utSymCreate(name));
     if(handler != NULL) {
-        handlerFuncptr = paFuncptrCreate(paBuiltinModule,
-            utSymCreateFormatted("%sHandler", name), handler);
+        handlerFuncptr = paFuncptrCreate(utSymCreateFormatted("%sHandler", name), handler);
         paStateruleSetHandlerFuncptr(staterule, handlerFuncptr);
     }
     paStateruleSetHasBlock(staterule, hasBlock);
@@ -838,21 +836,17 @@ static void basicStatementHandler(
     paExpr patternExpr = paExprGetNextStatementExpr(handlerExpr);
     paExpr beforeExpr, afterExpr, handlerDotExpr;
     paFuncptr handlerFuncptr = paFuncptrNull;
-    paIdent ident;
     utSym identSym;
 
     processHandlerExpr(statement, handlerExpr, &identSym, &handlerDotExpr,
         &beforeExpr, &afterExpr);
     if(handlerDotExpr != paExprNull) {
-        ident = paFindIdent(handlerDotExpr);
-        if(ident == paIdentNull) {
-            paExprError(handlerExpr, "Unable to find statement handler");
+        identSym = paExprGetSym(handlerDotExpr);
+        handlerFuncptr = paRootFindFuncptr(paTheRoot, identSym);
+        if(handlerFuncptr == paFuncptrNull) {
+            paExprError(handlerExpr, "Unable to find statement handler %s",
+                utSymGetName(identSym));
         }
-        if(paIdentGetType(ident) != PA_IDENT_FUNCPTR) {
-            paExprError(handlerExpr, "Not a statement handler");
-        }
-        // TODO: type checking?
-        handlerFuncptr = paIdentGetFuncptr(ident);
     }
     staterule = paStateruleCreate(paCurrentSyntax, handlerFuncptr, identSym, false,
         patternExpr);
@@ -875,8 +869,7 @@ static void blockStatementHandler(
     paExpr handlerExpr = usesExpr;
     paExpr syntaxExpr, beforeExpr, afterExpr, handlerDotExpr;
     paFuncptr handlerFuncptr = paFuncptrNull;
-    paIdent ident;
-    utSym syntaxSym = utSymNull, identSym;
+    utSym syntaxSym = utSymNull, identSym, handlerSym;
 
     // usesExpr: useSyntax(handlerExpr ident) | handlerExpr
     if(exprMatches(usesExpr, "useSyntax")) {
@@ -887,11 +880,12 @@ static void blockStatementHandler(
     processHandlerExpr(statement, handlerExpr, &identSym, &handlerDotExpr,
         &beforeExpr, &afterExpr);
     if(handlerDotExpr != paExprNull) {
-        ident = paFindIdent(handlerDotExpr);
-        if(ident == paIdentNull) {
-            paExprError(handlerDotExpr, "Statement handler not found");
+        handlerSym = paExprGetSym(handlerDotExpr);
+        handlerFuncptr = paRootFindFuncptr(paTheRoot, handlerSym);
+        if(handlerFuncptr == paFuncptrNull) {
+            paExprError(handlerDotExpr, "Statement handler %s not found",
+                utSymGetName(handlerSym));
         }
-        handlerFuncptr = paIdentGetFuncptr(ident);
     }
     staterule = paStateruleCreate(paCurrentSyntax, handlerFuncptr, identSym, true,
         patternExpr);
@@ -1201,32 +1195,6 @@ static void initGlobalSyms(void)
     paCharSym = utSymCreate("char");
 }
 
-// Register functions to handle L42 core statements.
-static void registerL42Handlers(void)
-{
-    paBuiltinModule = paModuleCreate(paTopModule, utSymCreate("builtin"));
-    paFuncptrCreate(paBuiltinModule, utSymCreate("classStatementHandler"),
-        paClassStatementHandler);
-    paFuncptrCreate(paBuiltinModule, utSymCreate("defStatementHandler"),
-        paDefStatementHandler);
-    paFuncptrCreate(paBuiltinModule, utSymCreate("doStatementHandler"),
-        paDoStatementHandler);
-    paFuncptrCreate(paBuiltinModule, utSymCreate("whileStatementHandler"),
-        paWhileStatementHandler);
-    paFuncptrCreate(paBuiltinModule, utSymCreate("ifStatementHandler"),
-        paIfStatementHandler);
-    paFuncptrCreate(paBuiltinModule, utSymCreate("elseIfStatementHandler"),
-        paElseIfStatementHandler);
-    paFuncptrCreate(paBuiltinModule, utSymCreate("elseStatementHandler"),
-        paElseStatementHandler);
-    paFuncptrCreate(paBuiltinModule, utSymCreate("returnStatementHandler"),
-        paReturnStatementHandler);
-    paFuncptrCreate(paBuiltinModule, utSymCreate("enumStatementHandler"),
-        paEnumStatementHandler);
-    paFuncptrCreate(paBuiltinModule, utSymCreate("exprStatementHandler"),
-        paExprStatementHandler);
-}
-
 // Create objects representing built-in stuff, like statement patters and operators.
 void paCreateBuiltins(void)
 {
@@ -1234,7 +1202,6 @@ void paCreateBuiltins(void)
     paStaterule staterule;
 
     initGlobalSyms();
-    registerL42Handlers();
     // statement basicStatement: "statement" handlerExpr ":" patternExpr
     stateruleCreate(syntax, basicStatementHandler, "basicStatement", false, "statement",
         "handlerExpr", ":", "patternExpr", NULL);
@@ -1334,51 +1301,26 @@ void paCreateBuiltins(void)
 }
 
 // Parse a source file or string.
-static paModule parseSource(
-    paModule outerModule,
-    utSym moduleName)
+static paStatement parseSource(void)
 {
     paLineNum = 0;
     paCurrentPrecedenceGroup = paPrecedenceGroupNull;
-    return paParse(outerModule, moduleName);
+    return paParse();
 }
 
 // Parse a command definition file.
-paModule paParseSourceFile(
-    paModule outerModule,
+paStatement paParseSourceFile(
     char *fileName)
 {
-    paModule module;
-    utSym sym;
-    paFile = fopen(fileName, "r");
+    paStatement statement;
 
+    paFile = fopen(fileName, "r");
     if(paFile == NULL) {
         fprintf(stderr, "Unable to open file %s\n", fileName);
-        return paModuleNull;
+        return paStatementNull;
     }
-    sym = utSymCreate(utReplaceSuffix(fileName, ""));
-    module = parseSource(outerModule, sym);
-    if(module == paModuleNull) {
-        fclose(paFile);
-        paFile = NULL;
-        return paModuleNull;
-    }
+    statement = parseSource();
     fclose(paFile);
     paFile = NULL;
-    return module;
+    return statement;
 }
-
-// Parse a string as a source file.  The returned module has no identifier,
-// which means it should be in the top level name space.
-paModule paParseCommand(void)
-{
-    paModule module;
-
-    paFile = NULL;
-    module = parseSource(paTopModule, utSymNull);
-    if(module == paModuleNull) {
-        return paModuleNull;
-    }
-    return module;
-}
-
