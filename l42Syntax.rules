@@ -1,28 +1,21 @@
 // This syntax is used parse syntax rules.
-grouping: "{" "\n" "}"
-statement simpleStatement: "statement" handlerExpr ":" patternExpr
+statement simpleStatement: "statement" statementExpr ":" patternExpr
 statement blockStatement: "blockstatement" usesExpr ":" patternExpr
 statement ruleStatement: ident ":" ruleExpr
-statement groupingStatement: "grouping" ":" groupingExpr
 blockstatement groupStatement: "group"
-blockstatement precedenceStatement: "precedence"
 statement leftStatement: "left" ident ":" patternExpr
 statement rightStatement: "right" ident ":" patternExpr
 statement mergeStatement: "merge" ident ":" patternExpr
 statement noneStatement: "none" ident ":" patternExpr
 
 group {
-    usesExpr: useSyntax(handlerExpr ident) | handlerExpr
-    handlerExpr: handler(statementExpr dotExpr) | statementExpr
-    dotExpr: ident | dot[ident]
+    usesExpr: useSyntax(statementExpr ident) | statementExpr
     statementExpr: ident | before(ident identListExpr) | after(ident identListExpr)
     identListExpr: ident | sequence[ident]
 
     none useSyntax: expr "uses" expr
-    none handler: expr "handler" expr
     none before: expr "before" expr
     none after: expr "after" expr
-    merge dot: expr '.' expr
 }
 group {
     ruleExpr: nodeExpr | or[nodeExpr]

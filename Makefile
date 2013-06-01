@@ -18,7 +18,8 @@ main.c \
 padatabase.c \
 parse.c \
 read.c \
-statement.c
+statement.c \
+syntax.c
 
 OBJS=$(patsubst %.c,obj/%.o,$(SOURCE))
 

@@ -12,13 +12,15 @@ void start(
     exeName = utReplaceSuffix(utBaseName(arg0), "");
     utInitLogFile(utSprintf("%s.log", exeName));
     paDatabaseStart();
-    vaValueStart();
     paTheRoot = paRootAlloc();
+    vaValueStart();
+    paSyntaxStart();
     paCreateBuiltins();
 }
 
 static void stop(void)
 {
+    paSyntaxStop();
     vaValueStop();
     paDatabaseStop();
     utStop(false);
@@ -29,16 +31,27 @@ int main(
     int argc,
     char *argv[])
 {
+    paSyntax syntax;
+    paStatement statement;
     int xArg = 1;
 
     start(argv[0]);
-    if(argc < 2) {
-        printf("Usage: parse42 file...\n");
+    if(utSetjmp()) {
+        printf("Error occured.\n");
+        stop();
         return 1;
     }
-    for(xArg = 1; xArg < argc; xArg++) {
-        paParseSourceFile(argv[xArg]);
+    if(argc < 2) {
+        printf("Usage: parse42 rulesFile [dataFile...]\n");
+        return 1;
     }
+    statement = paParseSourceFile(paParseSyntax, argv[1]);
+    syntax = paSyntaxCreate(utSymCreate(utReplaceSuffix(argv[xArg], "")));
+    paProcessSyntaxStatement(syntax, statement);
+    for(xArg = 2; xArg < argc; xArg++) {
+        statement = paParseSourceFile(syntax, argv[xArg]);
+    }
+    utUnsetjmp();
     stop();
     return 0;
 }

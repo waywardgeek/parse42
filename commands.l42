@@ -1,7 +1,7 @@
-# This is a test L42 input file.
+// This is a test L42 input file.
 
 
-# Days of the week
+// Days of the week
 enum Day (
     SUN,
     MON,
@@ -11,88 +11,91 @@ enum Day (
     FRI,
     SAT)
 
-# Time down to the second
-class Date
+// Time down to the second
+class Date {
     uint16 year = 0
     uint8 month = 0
     uint8 day = 0
     uint8 hour = 0
     uint8 minute = 0
     uint8 second = 0
+}
 
-class Result
+class Result {
     bool passed = false
     string errorMessage = ""
+}
 
-# Whatever you do DONT LOG IN!!!
-def Result login(string userName, string password)
+// Whatever you do DONT LOG IN!!!
+func Result login(string userName, string password) {
     print("User %s logging in with password %s\n" % (userName, password))
+}
 
-# Whatever you do DONT LOG OUT!!!
-def logout()
+// Whatever you do DONT LOG OUT!!!
+func logout()
 
-# Now, why would you do that?
-def quit()
+// Now, why would you do that?
+func quit()
 
-# Display help on a command.  If command is null, just list commands.
-def string helpCommand(string commandName)
+// Display help on a command.  If command is null, just list commands.
+func string helpCommand(string commandName)
 
-# Just says wether or not you are logged in.
-def bool loggedIn()
+// Just says wether or not you are logged in.
+func bool loggedIn()
 
-# Returns the amount of money in your account, in cents
-def int32 balance()
+// Returns the amount of money in your account, in cents
+func int32 balance()
 
-# Send money to another account.
-def Result send(string userName, int32 amount)
+// Send money to another account.
+func Result send(string userName, int32 amount)
 
-# List transactions
-def [(Date date, string userName, int32 amount)] transactions(Date fromDate, Date toDate)
+// List transactions
+func [(Date date, string userName, int32 amount)] transactions(Date fromDate, Date toDate)
 
-# List transactions
-def [(Date date, string userName, int32 amount)] transactions(Date fromDate)
+// List transactions
+func [(Date date, string userName, int32 amount)] transactions(Date fromDate)
 
-# List transactions
-def [(Date date, string userName, int32 amount)] transactions()
+// List transactions
+func [(Date date, string userName, int32 amount)] transactions()
 
-# Create a new user
-def Result newUser(string userName, string shownName, string email, string password)
+// Create a new user
+func Result newUser(string userName, string shownName, string email, string password)
 
-# Update account information.
-def Result updateAccount(string userName, string shownName, string email, password)
+// Update account information.
+func Result updateAccount(string userName, string shownName, string email, password)
 
-# Update account information.
-def Result updatePassword(string oldPassword, string newPassword)
+// Update account information.
+func Result updatePassword(string oldPassword, string newPassword)
 
-# Get account settings
-def (string userName, string shownName, string email) accountSettings()
+// Get account settings
+func (string userName, string shownName, string email) accountSettings()
 
-# Validate a new user
-def Result validateUser(string userName, string key)
+// Validate a new user
+func Result validateUser(string userName, string key)
 
-# Delete a user account
-def Result deleteMyAccount()
+// Delete a user account
+func Result deleteMyAccount()
 
-# Reset a user's password
-def Result resetPassword(string userName)
+// Reset a user's password
+func Result resetPassword(string userName)
 
-# Create a new thread
-def Result newPost(string subject, string message)
+// Create a new thread
+func Result newPost(string subject, string message)
 
-# List threads in the forum
-def [(int32 threadID, string subject, int32 numPosts)] listThreads()
+// List threads in the forum
+func [(int32 threadID, string subject, int32 numPosts)] listThreads()
 
-# Show posts in a thread
-def [(string shownName, string post)] showPosts(int32 threadID, int32 startPost, int32 endPost)
+// Show posts in a thread
+func [(string shownName, string post)] showPosts(int32 threadID, int32 startPost, int32 endPost)
 
-# Reply to a post
-def Result reply(int32 threadID, int32 postNumber, string message)
+// Reply to a post
+func Result reply(int32 threadID, int32 postNumber, string message)
 
-# Start following a thread
-def Result followThread(int32 threadID)
+// Start following a thread
+func Result followThread(int32 threadID)
 
-# Stop following a thread
-def Result leaveThread(int32 threadID)
+// Stop following a thread
+func Result leaveThread(int32 threadID)
 
-# Write out the entire database to an ASCII file
-def Result saveDatabase()
+// Write out the entire database to an ASCII file
+func Result saveDatabase()

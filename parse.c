@@ -30,6 +30,7 @@
 static paStatement paOuterStatement, paPrevStatement;
 static bool paDebug;
 static paToken paNextBeginToken;
+static paSyntax paTopSyntax;
 
 // Print out an error message and exit.
 void paExprError(
@@ -94,7 +95,7 @@ static bool readOneLine(void)
         paOuterStatement = paStatementGetStatement(paOuterStatement);
         staterule = paStatementGetStaterule(paOuterStatement);
         if(staterule == paStateruleNull) {
-            syntax = paL42Syntax;
+            syntax = paTopSyntax;
         } else {
             syntax = paRootFindSyntax(paTheRoot, paStateruleGetSubSyntaxSym(staterule));
             if(syntax == paSyntaxNull) {
@@ -491,8 +492,9 @@ static bool matchNodeExpr(
         } paEndExprExpr;
         return true;
     case PA_NODEEXPR_INTEGER:
-        return type == PA_EXPR_VALUE &&
-            vaValueGetType(paExprGetValue(expr)) == VA_INT;
+        return type == PA_EXPR_VALUE && (
+            vaValueGetType(paExprGetValue(expr)) == VA_POSINT ||
+            vaValueGetType(paExprGetValue(expr)) == VA_NEGINT);
     case PA_NODEEXPR_FLOAT:
         return type == PA_EXPR_VALUE && vaValueGetType(paExprGetValue(expr)) == VA_FLOAT;
     case PA_NODEEXPR_STRING:
@@ -526,7 +528,7 @@ static utSym findExprSym(
         return paOperatorGetSym(paExprGetOperator(expr));
     } else if(type == PA_EXPR_VALUE) {
         switch(vaValueGetType(paExprGetValue(expr))) {
-        case VA_INT:
+        case VA_POSINT: case VA_NEGINT:
             return paIntegerSym;
         case VA_FLOAT:
             return paFloatSym;
@@ -679,41 +681,15 @@ static paStatement parseStatement(void)
     return statement;
 }
 
-// Run statement handlers on the module's statements, bottom up, so that
-// statements indented more are handled first.
-static void handleStatement(
-    paStatement statement)
-{
-    paStaterule staterule = paStatementGetStaterule(statement);
-    paStatement subStatement;
-    paSyntax syntax;
-    paStatementHandler downHandler = NULL;
-    paStatementHandler upHandler = NULL;
-
-    if(staterule != paStateruleNull) {
-        syntax = paStateruleGetSyntax(staterule);
-        downHandler = paSyntaxGetDownHandler(syntax);
-        upHandler = paSyntaxGetDownHandler(syntax);
-    }
-    if(downHandler != NULL && paStateruleHasBlock(staterule)) {
-        downHandler(statement);
-    }
-    paSafeForeachStatementStatement(statement, subStatement) {
-        handleStatement(subStatement);
-    } paEndSafeStatementStatement;
-    if(upHandler != NULL) {
-        upHandler(statement);
-    }
-}
-
 // Parse an L42 file.  This is done one statement at a time.  Statements are
 // NEWLINE terminated.  Sub-statements are between BEGIN and END tokens.
-paStatement paParse(void)
+paStatement paParse(
+    paSyntax syntax)
 {
     paStatement topStatement = paStatementCreate(paStatementNull, paStateruleNull);
-    paStatement statement;
 
-    paCurrentSyntax = paL42Syntax;
+    paTopSyntax = syntax;
+    paCurrentSyntax = syntax;
     paOuterStatement = topStatement;
     paLexerStart();
     paNextBeginToken = paTokenNull;
@@ -725,10 +701,6 @@ paStatement paParse(void)
         paPrevStatement = parseStatement();
         destroyLineTokens();
     }
-    paForeachStatementStatement(topStatement, statement) {
-        handleStatement(statement);
-    } paEndStatementStatement;
     paLexerStop();
-    paPrintSyntax(paL42Syntax);
     return topStatement;
 }

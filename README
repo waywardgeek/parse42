@@ -6,90 +6,44 @@ sense that domain specific syntax and functionality can be added to the language
 provides a bit, which enables web templates to be written in Ruby, but the extension
 capabilities are quite limited.  The problem is that parsers, whether written by hand or
 based on popular tools like flex and bison, typically cannot change what they parse once
-compiled.  Parse42 is a slightly restricted parser that can parse C-like or Python-like
-languages very fast, while enabling new syntax to be added on-the-fly.  It is intended to
-power extensible languages like L42, but is also suitable for parsing arbitrary data
-formats.
+compiled.  Parse42 is a restricted parser that can parse C-like or Python-like languages
+rapidly, while enabling new syntax to be added on-the-fly.  It is intended to power
+extensible languages like L42, but is also suitable for parsing arbitrary data formats.
 
 The parser breaks input into a tree of statements.  There are two kinds of statements:
 simple statements and block statements.  Block statements have a list of child statements
 while simple statements do not.  There is an active syntax at any point in the input
-stream.  The active syntax can change while parsing sub-statements.  A syntax has
-statement grouping separators and terminators, which allows input tokens to be separated
-rapidly into a hierarchy of statements.  Compound statements such as if/elif/else use
-"before" and "after" restrictions to enforce statement order.  Each statement's tokens are
-then matched to a "statement" rule, using hash table lookup.  Each statement must have a
-unique signature, which is it's sequence of keywords and expressions.  The expressions
-within a statement are then parsed using an enhanced linear time precedence parser, using
-an operator precedence table associated with an expression rule group.  Once an expression
-tree has been built, it is tree-covered with expression rules.  This tree covering should
-run in close to linear time for most situations, but by having a hash table of rule/node
-pairs, we can quickly determine if a given rule has already been asked to match a given
-expression node in the expression tree, meaning the worst case runtime is the number of
-expression rules in an expression rule group times the number of nodes in the tree.
+stream.  The active syntax can change while parsing sub-statements.  Statements are either
+separated C-style with curly braces, or Python-style with indentation.  This allows input
+tokens to be separated rapidly into a hierarchy of statements.  Compound statements such
+as if/elif/else use "before" and "after" restrictions to enforce statement order.  Each
+statement's tokens are then matched to a "statement" rule, using hash table lookup.  Each
+statement must have a unique signature, which is it's sequence of keywords and
+expressions.  The expressions within a statement are then parsed using an enhanced
+precedence parser, using an operator precedence table associated with an expression rule
+group.  Once an expression tree has been built, it is tree-covered with expression rules.
+This tree covering should run in close to linear time for most situations, but by having a
+hash table of rule/node pairs, we can quickly determine if a given rule has already been
+asked to match a given expression node in the expression tree, meaning the worst case
+runtime is the number of expression rules in an expression rule group times the number of
+nodes in the tree.
 
-To parse C-like languages, curly braces group statements and semicolons separate them.
-For Python-like languages, indent/dedent group statements and newline is the statement
-separator. 
-
-The parse42 system includes a fast lexer that is suitable for most formats.  The input
-stream is either ASCII or UTF-8 encoded.  Tokens are separated by whitespace, and newlines
-only generate tokens when in use as a statement separator.  Keywords start with a letter
-and consist of the letters and digits up to the first non-letter/non-digit.  Operators are
-one, two, or three characters long, and consist of non-letters/non-digits.  If the default
-parse42 lexer is chosen, then several additional lexer types are defined.  Strings start
-and end with double-quote, and backslash escapes are allowed for newline, tab, return, and
-double-quote, and newline may be embedded.  Identifiers follow the rule of keywords, but
-may have backslash escapes of any character.  Any escaped character in an identifier makes
-it not a keyword.  Integers and floats follow strtol and strtod syntax.  // is a line
-comment, and C-style /* */ comments may be nested.  indent/dedent generate tokens only
-when in use for statment grouping.
+The parse42 system includes a fast lexer that is suitable for most C and Python like
+languages.  The input stream is ASCII or UTF-8 encoded.  Tokens are separated by
+whitespace, and newlines only generate tokens when in use as a statement separator.
+Keywords start with a letter and consist of the letters and digits up to the first
+non-letter/non-digit.  Operators are one, two, or three characters long, and consist of
+non-letters/non-digits.  Strings start and end with double-quote, and backslash escapes
+are allowed for newline, tab, return, and double-quote, and newline may be embedded.
+Identifiers follow the rule of keywords, but may have backslash escapes of any character.
+Any escaped character in an identifier makes it not a keyword.  Integers and floats follow
+strtol and strtod syntax.  // is a line comment, and C-style /* */ comments may be nested.
+indent/dedent generate tokens only when in use for Python style statment grouping.
 
 If the built-in lexer types are not sufficient, the user may provide custom lexer routings
 for parsing any of theses types, and provide additional token types.  In this way, parse42
 lexing can be done for most popular computer languages.
 
 Syntax is defined in a string passed to the parser at initialization, though any existing
-syntax can be extended at runtime.  The format for syntax definition is:
-
-// This syntax is used parse syntax rules.
-grouping: "{" "\n" "}"
-statement simpleStatement: "statement" handlerExpr ":" patternExpr
-statement blockStatement: "blockstatement" usesExpr ":" patternExpr
-statement ruleStatement: ident ":" ruleExpr
-statement groupingStatement: "grouping" ":" groupingExpr
-blockstatement groupStatement: "group"
-blockstatement precedenceStatement: "precedence"
-statement leftStatement: "left" ident ":" patternExpr
-statement rightStatement: "right" ident ":" patternExpr
-statement mergeStatement: "merge" ident ":" patternExpr
-statement noneStatement: "none" ident ":" patternExpr
-
-group {
-    usesExpr: useSyntax(handlerExpr ident) | handlerExpr
-    handlerExpr: handler(statementExpr dotExpr) | statementExpr
-    dotExpr: ident | dot[ident]
-    statementExpr: ident | before(ident identListExpr) | after(ident identListExpr)
-    identListExpr: ident | sequence[ident]
-
-    none useSyntax: expr "uses" expr
-    none handler: expr "handler" expr
-    none before: expr "before" expr
-    none after: expr "after" expr
-    merge dot: expr '.' expr
-}
-group {
-    ruleExpr: nodeExpr | or[nodeExpr]
-    nodeExpr: ident | string | operator(ident nodeListExpr) | list(ident nodeExpr)
-    nodeListExpr: nodeExpr | sequence(nodeExpr)
-
-    merge or: expr "|" expr
-    none list: expr "[" expr "]"
-    none operator: expr "(" expr ")"
-}
-group {
-    patternExpr: elementExpr | sequence[elementExpr]
-    elementExpr: string | ident
-}
-// This operator is available in all groups
-merge sequence: expr expr # Operators without tokens are allowed
+syntax can be extended at runtime.  The format for syntax definition showin in
+l42Syntax.rules.
