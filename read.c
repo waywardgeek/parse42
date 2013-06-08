@@ -1,5 +1,6 @@
 #include "pa.h"
 
+paRoot paTheRoot;
 FILE *paFile;
 // Must be set before parsing so that the parser knows where to add stuff.
 uint32 paFileSize, paLineNum;

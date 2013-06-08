@@ -14,7 +14,6 @@ value/vadatabase.c \
 value/value.c \
 expression.c \
 lexer.c \
-main.c \
 padatabase.c \
 parse.c \
 read.c \
@@ -23,13 +22,19 @@ syntax.c
 
 OBJS=$(patsubst %.c,obj/%.o,$(SOURCE))
 
-all: padatabase.c l42
+all: padatabase.c parse42 libparse42.a
 
 obj/%.o: %.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
 
-l42: $(OBJS)
-	gcc $(LFLAGS) -DDD_DEBUG -o l42 $(OBJS) -lddutil-dbg
+main.o: main.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
+
+parse42: $(OBJS) main.o
+	gcc $(LFLAGS) -DDD_DEBUG -o parse42 $(OBJS) main.o -lddutil-dbg
+
+libparse42.a: $(OBJS)
+	$(AR) cqs libparse42.a $(OBJS)
 
 depend: padatabase.h padatabase.c
 	makedepend -- $(CFLAGS) -- $(SOURCE)

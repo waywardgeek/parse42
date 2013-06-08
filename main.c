@@ -1,7 +1,5 @@
 #include "pa.h"
 
-paRoot paTheRoot;
-
 // Create the root module statement.
 void start(
     char *arg0)
