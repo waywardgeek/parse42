@@ -84,7 +84,6 @@ static paOperator operatorCreate(
     paPrecedenceGroup precedenceGroup = paPrecedenceGroupCreate(syntax, paOperatorNull);
     paOperator operator = paOperatorAlloc();
     paPattern pattern = paPatternAlloc();
-    paElement element;
     va_list ap;
     char *arg;
 
@@ -96,7 +95,7 @@ static paOperator operatorCreate(
     va_start(ap, name); 
     arg = va_arg(ap, char *);
     while(arg != NULL) {
-        element = elementCreate(syntax, pattern, arg);
+        elementCreate(syntax, pattern, arg);
         arg = va_arg(ap, char *);
     }
     va_end(ap);
