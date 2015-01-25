@@ -1,7 +1,5 @@
 #include "padatabase.h"
 
-typedef void (*paStatementHandler)(paStatement statement);
-
 // Main routines
 paStatement paParseSourceFile(paSyntax syntax, char *fileName);
 void paCreateBuiltins(void);
